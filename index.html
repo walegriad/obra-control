@@ -1,0 +1,2432 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Obra Control — Gestión integral de proyectos</title>
+<meta name="description" content="Control de presupuesto, gastos, ofertas, órdenes de compra y contratos para proyectos de construcción.">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#081113">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Obra Control">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --fondo:#081113;
+  --fondo-2:#0B181B;
+  --panel:#0F2126;
+  --panel-2:#143036;
+  --panel-3:#1B3D44;
+  --borde:rgba(255,255,255,.09);
+  --borde-fuerte:rgba(255,255,255,.16);
+  --texto:#E9F3F4;
+  --texto-2:#9BB2B7;
+  --texto-3:#6B8085;
+  --ambar:#F2A93B;
+  --ambar-claro:#FFC96B;
+  --ambar-oscuro:#C9871F;
+  --menta:#45D6A6;
+  --menta-oscuro:#1E8F6B;
+  --rojo:#F2705B;
+  --rojo-oscuro:#B03A28;
+  --azul:#5BA8F2;
+  --azul-oscuro:#2B6CB0;
+  --sidebar:248px;
+  --radio:14px;
+  --radio-sm:10px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--fondo);
+  background-image:
+    radial-gradient(1100px 600px at 12% -8%, rgba(242,169,59,.13), transparent 62%),
+    radial-gradient(900px 620px at 96% 8%, rgba(69,214,166,.09), transparent 58%);
+  background-attachment:fixed;
+  color:var(--texto);
+  font-family:'Inter',system-ui,-apple-system,sans-serif;
+  font-size:15px;line-height:1.5;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4,.display{font-family:'Oswald',sans-serif;font-weight:500;letter-spacing:.02em;margin:0}
+.mono{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums}
+button{font-family:inherit;font-size:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select,textarea{font-family:inherit;font-size:15px}
+a{color:var(--ambar);text-decoration:none}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--panel-3);border-radius:9px}
+
+.app{display:flex;min-height:100vh}
+.lateral{
+  position:fixed;top:0;left:0;bottom:0;width:var(--sidebar);
+  background:linear-gradient(180deg,rgba(15,33,38,.98),rgba(8,17,19,.98));
+  border-right:1px solid var(--borde);
+  padding:22px 14px;display:flex;flex-direction:column;gap:4px;z-index:40;
+  overflow-y:auto;
+}
+.marca{display:flex;align-items:center;gap:11px;padding:0 8px 18px}
+.marca-icono{
+  width:40px;height:40px;border-radius:11px;flex-shrink:0;
+  background:linear-gradient(140deg,var(--ambar-claro),var(--ambar-oscuro));
+  display:grid;place-items:center;color:#1A1005;
+  box-shadow:0 6px 18px rgba(242,169,59,.28);
+}
+.marca-txt .n{font-family:'Oswald',sans-serif;font-size:20px;line-height:1;letter-spacing:.06em;text-transform:uppercase}
+.marca-txt .s{font-size:10.5px;color:var(--texto-3);letter-spacing:.16em;text-transform:uppercase;margin-top:3px}
+.nav-btn{
+  display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:var(--radio-sm);
+  color:var(--texto-2);font-weight:500;font-size:14px;transition:.15s;width:100%;text-align:left;
+}
+.nav-btn:hover{background:var(--panel);color:var(--texto)}
+.nav-btn.on{background:var(--panel-2);color:var(--texto);box-shadow:inset 3px 0 0 var(--ambar)}
+.nav-btn.on svg{color:var(--ambar)}
+.nav-sep{height:1px;background:var(--borde);margin:8px 4px}
+.lateral-pie{margin-top:auto;padding:14px 8px 0;border-top:1px solid var(--borde);font-size:11px;color:var(--texto-3)}
+
+.principal{flex:1;margin-left:var(--sidebar);padding:26px 30px 60px;max-width:1500px}
+.barra-inf{display:none}
+
+.cabecera{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;flex-wrap:wrap;margin-bottom:24px}
+.cabecera h1{font-size:30px;text-transform:uppercase;letter-spacing:.05em}
+.cabecera .sub{color:var(--texto-2);font-size:13.5px;margin-top:4px}
+.acciones{display:flex;gap:9px;flex-wrap:wrap}
+
+.btn{
+  display:inline-flex;align-items:center;gap:8px;padding:10px 15px;border-radius:var(--radio-sm);
+  font-weight:600;font-size:14px;border:1px solid var(--borde);background:var(--panel);
+  color:var(--texto);transition:.15s;white-space:nowrap;
+}
+.btn:hover{background:var(--panel-2);border-color:var(--borde-fuerte)}
+.btn-p{background:linear-gradient(135deg,var(--ambar-claro),var(--ambar));color:#1A1005;border-color:transparent}
+.btn-p:hover{background:linear-gradient(135deg,#FFD588,var(--ambar-claro));color:#1A1005}
+.btn-peligro{color:var(--rojo);border-color:rgba(242,112,91,.35)}
+.btn-peligro:hover{background:rgba(242,112,91,.12)}
+.btn-sm{padding:7px 11px;font-size:13px;border-radius:8px}
+.btn-icono{padding:8px;border-radius:8px;color:var(--texto-2)}
+.btn-icono:hover{background:var(--panel-2);color:var(--texto)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+.rejilla{display:grid;gap:16px}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(195px,1fr))}
+.tarjeta{
+  background:linear-gradient(160deg,var(--panel),var(--fondo-2));
+  border:1px solid var(--borde);border-radius:var(--radio);padding:18px;
+}
+.kpi{position:relative;overflow:hidden}
+.kpi-clickable{border:1px solid var(--borde);transition:.15s}
+.kpi-clickable:hover{background:linear-gradient(160deg,var(--panel-3),var(--panel));border-color:var(--borde-fuerte)}
+.kpi::after{content:'';position:absolute;left:18px;bottom:0;width:46px;height:3px;background:var(--ambar);border-radius:3px 3px 0 0}
+.kpi.menta::after{background:var(--menta)}
+.kpi.rojo::after{background:var(--rojo)}
+.kpi.azul::after{background:var(--azul)}
+.kpi .etq{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--texto-3);font-weight:600}
+.kpi .val{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;margin-top:9px;letter-spacing:-.02em;line-height:1.15}
+.kpi .pie{font-size:12.5px;color:var(--texto-2);margin-top:6px}
+.tarjeta h3{font-size:16px;text-transform:uppercase;letter-spacing:.07em;color:var(--texto)}
+.tarjeta-cab{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+
+.pista{height:8px;background:rgba(255,255,255,.07);border-radius:8px;overflow:hidden}
+.relleno{height:100%;border-radius:8px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+.f-sano{background:linear-gradient(90deg,var(--menta-oscuro),var(--menta))}
+.f-alerta{background:linear-gradient(90deg,var(--ambar-oscuro),var(--ambar-claro))}
+.f-excedido{background:linear-gradient(90deg,var(--rojo-oscuro),var(--rojo))}
+.f-sinPresupuesto{background:var(--panel-3)}
+
+.fila-cat{padding:13px 0;border-bottom:1px solid var(--borde)}
+.fila-cat:last-child{border-bottom:none}
+.fila-cat-top{display:flex;align-items:center;gap:11px;margin-bottom:9px}
+.cat-icono{width:32px;height:32px;border-radius:9px;background:var(--panel-2);display:grid;place-items:center;color:var(--ambar);flex-shrink:0}
+.fila-cat-nom{font-weight:600;font-size:14.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fila-cat-cifras{display:flex;justify-content:space-between;font-size:12.5px;color:var(--texto-2);margin-top:7px;gap:10px}
+
+.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+.chip-sano{background:rgba(69,214,166,.14);color:var(--menta)}
+.chip-alerta{background:rgba(242,169,59,.15);color:var(--ambar-claro)}
+.chip-excedido{background:rgba(242,112,91,.15);color:var(--rojo)}
+.chip-sinPresupuesto{background:rgba(255,255,255,.07);color:var(--texto-3)}
+.chip-neutro{background:var(--panel-2);color:var(--texto-2)}
+.chip-azul{background:rgba(91,168,242,.14);color:var(--azul)}
+
+.tabla-cont{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -18px;padding:0 18px}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:640px}
+th{
+  text-align:left;font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--texto-3);
+  font-weight:700;padding:0 12px 10px;border-bottom:1px solid var(--borde);white-space:nowrap;
+}
+td{padding:12px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:middle}
+tbody tr:hover{background:rgba(255,255,255,.025)}
+.der{text-align:right}
+.cen{text-align:center}
+
+.campo{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.campo label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--texto-3);font-weight:700}
+.campo input,.campo select,.campo textarea{
+  background:var(--fondo-2);border:1px solid var(--borde);border-radius:9px;padding:11px 12px;
+  color:var(--texto);width:100%;transition:.15s;
+}
+.campo input:focus,.campo select:focus,.campo textarea:focus{outline:none;border-color:var(--ambar);box-shadow:0 0 0 3px rgba(242,169,59,.14)}
+.campo textarea{resize:vertical;min-height:64px}
+.campo input.mono{font-family:'JetBrains Mono',monospace}
+.dos{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tres{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+input[type=range]{-webkit-appearance:none;appearance:none;height:5px;background:var(--panel-3);border-radius:5px;padding:0}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;background:var(--ambar);cursor:pointer;border:2px solid var(--fondo)}
+input[type=range]::-moz-range-thumb{width:17px;height:17px;border-radius:50%;background:var(--ambar);cursor:pointer;border:2px solid var(--fondo)}
+.interruptor{display:inline-flex;align-items:center;gap:9px;cursor:pointer;font-size:14px}
+.interruptor input{display:none}
+.pista-sw{width:40px;height:22px;border-radius:99px;background:var(--panel-3);position:relative;transition:.2s;flex-shrink:0}
+.pista-sw::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--texto-2);transition:.2s}
+.interruptor input:checked+.pista-sw{background:rgba(69,214,166,.35)}
+.interruptor input:checked+.pista-sw::after{left:21px;background:var(--menta)}
+
+.velo{position:fixed;inset:0;background:rgba(4,10,11,.78);backdrop-filter:blur(5px);z-index:100;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto}
+.modal{
+  background:linear-gradient(160deg,var(--panel),var(--fondo-2));border:1px solid var(--borde-fuerte);
+  border-radius:18px;width:100%;max-width:560px;padding:22px;margin:auto;
+  box-shadow:0 26px 70px rgba(0,0,0,.6);
+}
+.modal-cab{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.modal-cab h3{font-size:19px;text-transform:uppercase;letter-spacing:.05em}
+.modal-pie{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;flex-wrap:wrap}
+
+.vacio{text-align:center;padding:44px 20px;color:var(--texto-3)}
+.vacio svg{opacity:.35;margin-bottom:12px}
+.vacio p{margin:0 0 4px;font-size:14px}
+.aviso{display:flex;gap:11px;padding:12px 14px;border-radius:var(--radio-sm);font-size:13.5px;line-height:1.45;align-items:flex-start;margin-bottom:9px}
+.aviso svg{flex-shrink:0;margin-top:1px}
+.a-alto{background:rgba(242,112,91,.1);border:1px solid rgba(242,112,91,.24);color:#FFC3B8}
+.a-medio{background:rgba(242,169,59,.09);border:1px solid rgba(242,169,59,.22);color:#FFDFA8}
+.a-info{background:rgba(255,255,255,.045);border:1px solid var(--borde);color:var(--texto-2)}
+.a-ok{background:rgba(69,214,166,.09);border:1px solid rgba(69,214,166,.22);color:#A9F0D8}
+.filtros{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.filtros select,.filtros input{
+  background:var(--fondo-2);border:1px solid var(--borde);border-radius:9px;padding:9px 11px;color:var(--texto);font-size:13.5px;
+}
+.filtros input{flex:1;min-width:170px}
+.filtros select:focus,.filtros input:focus{outline:none;border-color:var(--ambar)}
+.brindis{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:200;
+  background:var(--panel-2);border:1px solid var(--borde-fuerte);border-radius:11px;padding:12px 18px;
+  font-size:14px;font-weight:500;box-shadow:0 12px 34px rgba(0,0,0,.5);display:flex;align-items:center;gap:9px;
+  max-width:calc(100vw - 32px);
+}
+.brindis.ok{border-color:rgba(69,214,166,.4);color:var(--menta)}
+.brindis.err{border-color:rgba(242,112,91,.4);color:var(--rojo)}
+.pos{color:var(--menta)}
+.neg{color:var(--rojo)}
+.tenue{color:var(--texto-2)}
+.mini{font-size:12px;color:var(--texto-3)}
+.sep{height:1px;background:var(--borde);margin:16px 0}
+.ganadora{background:rgba(69,214,166,.06)!important;box-shadow:inset 3px 0 0 var(--menta)}
+.barrita{height:5px;border-radius:5px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:5px}
+.barrita i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,var(--ambar-oscuro),var(--ambar-claro))}
+
+.estrellas{display:inline-flex;gap:2px}
+.estrella{cursor:pointer;color:var(--panel-3);transition:.15s}
+.estrella.on{color:var(--ambar)}
+.estrella:hover{color:var(--ambar-claro)}
+
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cal-dia{
+  aspect-ratio:1;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-size:13px;position:relative;cursor:pointer;transition:.12s;
+}
+.cal-dia:hover{background:var(--panel-2)}
+.cal-dia.hoy{background:var(--panel-2);border:1px solid var(--ambar);font-weight:700}
+.cal-dia.sel{background:rgba(242,169,59,.18);border:1px solid var(--ambar)}
+.cal-dia.otro{color:var(--texto-3);opacity:.4}
+.cal-dot{width:5px;height:5px;border-radius:50%;position:absolute;bottom:4px}
+
+.ajustes-movil{display:none}
+@media(max-width:959px){
+  .ajustes-movil{display:inline-flex}
+  .lateral{display:none}
+  .principal{margin-left:0;padding:20px 18px 100px}
+  .barra-inf{
+    display:flex;position:fixed;bottom:0;left:0;right:0;z-index:50;
+    background:rgba(11,24,27,.97);backdrop-filter:blur(14px);border-top:1px solid var(--borde);
+    padding:6px 2px calc(6px + env(safe-area-inset-bottom));
+  }
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 1px;color:var(--texto-3);font-size:9px;font-weight:600;border-radius:9px}
+  .tab.on{color:var(--ambar)}
+  .cabecera h1{font-size:24px}
+  .cabecera{align-items:flex-start;margin-bottom:18px}
+  .kpi .val{font-size:22px}
+}
+@media(min-width:700px) and (max-width:959px){
+  table{min-width:0}
+  .tabla-cont{margin:0;padding:0}
+}
+@media(max-width:699px){
+  body{font-size:14.5px}
+  .principal{padding:16px 13px 100px}
+  .tarjeta{padding:15px;border-radius:12px}
+  .kpis{grid-template-columns:1fr 1fr;gap:11px}
+  .kpi .val{font-size:19px}
+  .kpi .etq{font-size:9.5px}
+  .kpi::after{left:15px;width:34px}
+  .dos,.tres{grid-template-columns:1fr}
+  .modal{padding:18px;border-radius:15px}
+  .velo{padding:12px 10px}
+  .acciones{width:100%}
+  .acciones .btn{flex:1;justify-content:center}
+  .tabla-cont{margin:0 -15px;padding:0 15px}
+  .cal-dia{font-size:11px}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div id="raiz"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+<script src="engine.js"></script>
+<script src="photos.js"></script>
+
+<script type="text/babel" data-presets="env,react">
+const { useState, useEffect, useMemo, useRef } = React;
+const E = window.ENGINE;
+const CLAVE = 'obracontrol_v1';
+
+/* ============================================================
+   ICONOS
+   ============================================================ */
+const TRAZOS = {
+  panel:'M3 3h7v8H3zM14 3h7v5h-7zM14 11h7v10h-7zM3 14h7v7H3z',
+  presupuesto:'M21 12a9 9 0 1 1-9-9v9z|M14 3a8 8 0 0 1 7 7h-7z',
+  gastos:'M6 2h12v20l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h4',
+  ofertas:'M9 3h6v3H9zM15 4.5h3V21H6V4.5h3M9 11h7M9 15.5h7M6.4 11h.01M6.4 15.5h.01',
+  reportes:'M4 20V11M10 20V4M16 20v-6M22 20H2',
+  ajustes:'M4 6h8M17 6h3M4 12h3M12 12h8M4 18h8M17 18h3|c:14.5,6,2.5|c:9.5,12,2.5|c:14.5,18,2.5',
+  mas:'M12 5v14M5 12h14',
+  equis:'M18 6L6 18M6 6l12 12',
+  lapiz:'M17 3l4 4L8 20l-5 1 1-5z',
+  basura:'M3 6h18M8 6V4h8v2M6 6l1 15h10l1-15M10 11v6M14 11v6',
+  check:'M20 6L9 17l-5-5',
+  abajo:'M6 9l6 6 6-6',
+  derecha:'M9 6l6 6-6 6',
+  buscar:'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM21 21l-5-5',
+  bajar:'M12 3v13M6 12l6 6 6-6M4 21h16',
+  subir:'M12 21V8M6 12l6-6 6 6M4 3h16',
+  alerta:'M12 3L1.5 21h21zM12 9v5M12 17.5v.01',
+  info:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v6M12 7.5v.01',
+  arribaT:'M3 17l6-6 4 4 8-8M15 7h6v6',
+  abajoT:'M3 7l6 6 4-4 8 8M15 17h6v-6',
+  edificio:'M3 21h18M5 21V3h9v18M14 9h5v12M8 7h3M8 11h3M8 15h3',
+  calendario:'M3 5h18v16H3zM3 10h18M8 3v4M16 3v4',
+  medalla:'M12 2l3 5 6 1-4.5 4 1 6-5.5-3-5.5 3 1-6L3 8l6-1z',
+  reloj:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3.5 2',
+  escudo:'M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z|M9 12l2 2 4-4',
+  sincro:'M20 5v6h-6M4 19v-6h6M4.5 10a8 8 0 0 1 13-3l2.5 3M19.5 14a8 8 0 0 1-13 3L4 14',
+  proyecto:'M4 4h7l2 3h7v13H4zM9 13h6',
+  preliminares:'M4 21V3M4 4h13l-2 3.5L17 11H4z',
+  obra_gris:'M2 4h20v16H2zM2 9.5h20M2 15h20M8 4v5.5M16 4v5.5M12 9.5V15M6 15v5M18 15v5',
+  estructura:'M3 21h18M6 21V8M12 21V8M18 21V8M3 8h18l-9-5z',
+  techo:'M2 11l10-8 10 8M5 10v11h14V10M10 21v-6h4v6',
+  electrico:'M13 2L4 14h7l-1 8 9-12h-7z',
+  hidro:'M12 3s6.5 6.8 6.5 10.8A6.5 6.5 0 0 1 5.5 13.8C5.5 9.8 12 3 12 3z',
+  acabados:'M12 2.5l2 5.2 5.2 2-5.2 2-2 5.2-2-5.2-5.2-2 5.2-2zM18.5 15l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z',
+  pintura:'M9.5 21h5M12 21v-4.5M6.5 3h11v6.5a5.5 5.5 0 0 1-11 0z',
+  carpinteria:'M14.5 2.5l7 7-3 3-7-7zM11 6L2.5 14.5l4.5 4.5L15.5 10.5',
+  herreria:'M20.5 7a5 5 0 0 1-6.6 6.6L6 21.5 2.5 18l7.9-7.9A5 5 0 0 1 17 3.5l-3 3 3.5 3.5 3-3z',
+  mano_obra:'M9 11.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2 21c0-4 3.2-6 7-6s7 2 7 6M16.5 5.2a3.5 3.5 0 0 1 0 6.6M18 21c0-3-.9-4.6-2-5.6',
+  imprevistos:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7.5v5.5M12 16.5v.01',
+  instalar:'M12 3v11M7.5 9.5L12 14l4.5-4.5M4 20h16',
+  copiar:'M8.5 8.5h12v12h-12z|M15.5 4.5V3.5h-12v12h1',
+  camara:'M4 8h3l2-3h6l2 3h3v12H4zM12 18a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
+  ubicacion:'M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z|c:12,9,2.5',
+  orden:'M9 3h6v3H9zM15 4.5h3V21H6V4.5h3M9 11h6M9 14h4M16 11l-1.5 1.5L13 11',
+  contrato:'M6 3h12v18H6zM9 7h6M9 10h6M9 13h3M14 17l2-2-2-2',
+  flujo:'M3 12h4l3-7 4 14 3-7h4',
+  estrella:'M12 2l3 5 6 1-4.5 4 1 6-5.5-3-5.5 3 1-6L3 8l6-1z',
+  pago:'M2 7h20v12H2zM2 11h20M6 15h4M14 15h4',
+  imprimir:'M6 9V2h12v7M6 18H4V13h16v5h-2M6 13h12v8H6z',
+};
+function Icono({ n, s = 20, c }) {
+  const def = TRAZOS[n] || TRAZOS.info;
+  const partes = def.split('|');
+  const nodos = [];
+  partes.forEach((p, i) => {
+    if (p.indexOf('c:') === 0) {
+      const [x, y, r] = p.slice(2).split(',');
+      nodos.push(<circle key={i} cx={x} cy={y} r={r} />);
+    } else {
+      nodos.push(<path key={i} d={p} />);
+    }
+  });
+  return (
+    <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c || 'currentColor'}
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      {nodos}
+    </svg>
+  );
+}
+
+/* ============================================================
+   FORMATO
+   ============================================================ */
+function useDinero(moneda) {
+  return useMemo(() => {
+    return (v, corto) => {
+      const n = E.num(v);
+      const neg = n < 0;
+      const a = Math.abs(n);
+      let txt;
+      if (corto && a >= 1000000) txt = (a / 1000000).toFixed(a >= 10000000 ? 0 : 1) + 'M';
+      else if (corto && a >= 10000) txt = (a / 1000).toFixed(a >= 100000 ? 0 : 1) + 'k';
+      else txt = a.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      return (neg ? '-' : '') + moneda + ' ' + txt;
+    };
+  }, [moneda]);
+}
+const fFecha = (f) => {
+  if (!f) return '—';
+  const [a, m, d] = String(f).split('-');
+  return d + '/' + m + '/' + String(a).slice(2);
+};
+
+/* ============================================================
+   PERSISTENCIA LOCAL
+   ============================================================ */
+function cargar() {
+  try {
+    const crudo = localStorage.getItem(CLAVE);
+    if (!crudo) return E.estadoDemo();
+    const d = JSON.parse(crudo);
+    const base = E.estadoVacio();
+    return Object.assign(base, d);
+  } catch (e) {
+    return E.estadoDemo();
+  }
+}
+function guardar(estado) {
+  try { localStorage.setItem(CLAVE, JSON.stringify(estado)); return true; }
+  catch (e) { return false; }
+}
+
+/* ============================================================
+   COMPONENTES REUTILIZABLES
+   ============================================================ */
+function Kpi({ etq, val, pie, tono, onClick }) {
+  const Tag = onClick ? 'button' : 'div';
+  return (
+    <Tag className={'tarjeta kpi ' + (tono || '') + (onClick ? ' kpi-clickable' : '')}
+      onClick={onClick}
+      style={onClick ? { cursor: 'pointer', textAlign: 'left', width: '100%' } : null}>
+      <div className="etq">{etq}</div>
+      <div className="val">{val}</div>
+      {pie ? <div className="pie">{pie}</div> : null}
+    </Tag>
+  );
+}
+
+function Anillo({ pct, tam = 168, grosor = 15, estado, centro, sub }) {
+  const p = Math.max(0, Math.min(pct, 120));
+  const r = (tam - grosor) / 2;
+  const c = 2 * Math.PI * r;
+  const avance = Math.min(p, 100) / 100;
+  const color =
+    estado === 'excedido' ? 'var(--rojo)' : estado === 'alerta' ? 'var(--ambar)' : estado === 'sinPresupuesto' ? 'var(--panel-3)' : 'var(--menta)';
+  return (
+    <div style={{ position: 'relative', width: tam, height: tam, margin: '0 auto' }}>
+      <svg width={tam} height={tam} style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={tam / 2} cy={tam / 2} r={r} stroke="rgba(255,255,255,.07)" strokeWidth={grosor} fill="none" />
+        <circle cx={tam / 2} cy={tam / 2} r={r} stroke={color} strokeWidth={grosor} fill="none"
+          strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - avance)}
+          style={{ transition: 'stroke-dashoffset .8s cubic-bezier(.4,0,.2,1)' }} />
+      </svg>
+      <div style={{ position: 'absolute', inset: 0, display: 'grid', placeContent: 'center', textAlign: 'center' }}>
+        <div className="mono" style={{ fontSize: tam > 150 ? 32 : 24, fontWeight: 700, color }}>{centro}</div>
+        <div style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--texto-3)', marginTop: 4 }}>{sub}</div>
+      </div>
+    </div>
+  );
+}
+
+function Barra({ pct, estado }) {
+  return (
+    <div className="pista">
+      <div className={'relleno f-' + estado} style={{ width: Math.min(Math.max(pct, 0), 100) + '%' }} />
+    </div>
+  );
+}
+
+function Chip({ estado, texto }) {
+  return <span className={'chip chip-' + estado}>{texto}</span>;
+}
+
+function Modal({ titulo, onCerrar, children, pie, ancho }) {
+  useEffect(() => {
+    const esc = (e) => { if (e.key === 'Escape') onCerrar(); };
+    document.addEventListener('keydown', esc);
+    document.body.style.overflow = 'hidden';
+    return () => { document.removeEventListener('keydown', esc); document.body.style.overflow = ''; };
+  }, [onCerrar]);
+  return (
+    <div className="velo" onMouseDown={(e) => { if (e.target === e.currentTarget) onCerrar(); }}>
+      <div className="modal" style={ancho ? { maxWidth: ancho } : null}>
+        <div className="modal-cab">
+          <h3>{titulo}</h3>
+          <button className="btn-icono" onClick={onCerrar} aria-label="Cerrar"><Icono n="equis" /></button>
+        </div>
+        {children}
+        {pie ? <div className="modal-pie">{pie}</div> : null}
+      </div>
+    </div>
+  );
+}
+
+function Vacio({ icono, titulo, texto, accion }) {
+  return (
+    <div className="vacio">
+      <Icono n={icono || 'info'} s={40} />
+      <p style={{ color: 'var(--texto-2)', fontWeight: 600 }}>{titulo}</p>
+      <p className="mini">{texto}</p>
+      {accion ? <div style={{ marginTop: 16 }}>{accion}</div> : null}
+    </div>
+  );
+}
+
+function Campo({ etq, children }) {
+  return <div className="campo"><label>{etq}</label>{children}</div>;
+}
+
+function CampoProveedor({ valor, onChange, proveedores, accion, brindar, placeholder }) {
+  const [abierto, setAbierto] = useState(false);
+  const [txt, setTxt] = useState(valor || '');
+  const ref = useRef(null);
+  useEffect(() => { setTxt(valor || ''); }, [valor]);
+  useEffect(() => {
+    if (!abierto) return;
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setAbierto(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [abierto]);
+  const nombres = (proveedores || []).map((p) => p.nombre);
+  const filtrados = txt.trim() ? nombres.filter((n) => n.toLowerCase().includes(txt.toLowerCase())) : nombres;
+  const exacto = nombres.some((n) => n.toLowerCase() === txt.trim().toLowerCase());
+  return (
+    <div ref={ref} style={{position:'relative'}}>
+      <input value={txt} placeholder={placeholder || 'Proveedor'}
+        onChange={(e) => { setTxt(e.target.value); onChange(e.target.value); setAbierto(true); }}
+        onFocus={() => setAbierto(true)} />
+      {abierto && (filtrados.length > 0 || (txt.trim() && !exacto)) ? (
+        <div style={{position:'absolute',left:0,right:0,top:'100%',zIndex:50,background:'var(--panel)',border:'1px solid var(--borde)',borderRadius:10,maxHeight:180,overflowY:'auto',boxShadow:'0 8px 24px rgba(0,0,0,.4)'}}>
+          {filtrados.map((n) => (
+            <button key={n} type="button" style={{display:'block',width:'100%',textAlign:'left',padding:'9px 12px',background:'none',border:'none',color:'var(--texto)',fontSize:14,cursor:'pointer'}}
+              onMouseDown={(e) => { e.preventDefault(); setTxt(n); onChange(n); setAbierto(false); }}>{n}</button>
+          ))}
+          {txt.trim() && !exacto ? (
+            <button type="button" style={{display:'flex',alignItems:'center',gap:6,width:'100%',textAlign:'left',padding:'9px 12px',background:'none',border:'none',color:'var(--menta)',fontSize:13,cursor:'pointer',borderTop:'1px solid var(--borde)'}}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                const nuevo = E.normalizarProveedor({ nombre: txt.trim() });
+                accion((s) => ({ ...s, proveedores: (s.proveedores || []).concat([nuevo]) }));
+                if (brindar) brindar('Proveedor "' + txt.trim() + '" creado.', 'ok');
+                setAbierto(false);
+              }}><Icono n="mas" s={14} />Crear "{txt.trim()}"</button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Estrellas({ valor, onChange, tam = 18 }) {
+  return (
+    <div className="estrellas">
+      {[1,2,3,4,5].map((n) => (
+        <button key={n} className={'estrella' + (n <= valor ? ' on' : '')}
+          onClick={onChange ? () => onChange(n) : undefined}
+          style={{ cursor: onChange ? 'pointer' : 'default' }}>
+          <Icono n="estrella" s={tam} c={n <= valor ? 'var(--ambar)' : 'var(--panel-3)'} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ============================================================
+   VISTA: PANEL
+   ============================================================ */
+function Panel({ estado, v, alertas, dinero, irA, irAGastosPendientes }) {
+  const cats = v.detalle.filter((d) => d.presupuesto > 0 || d.gastado > 0);
+  const ultimos = estado.gastos
+    .filter((g) => g.proyectoId === estado.proyectoActivo)
+    .slice().sort((a, b) => (a.fecha < b.fecha ? 1 : -1)).slice(0, 5);
+  const mapaCat = {};
+  estado.categorias.forEach((c) => (mapaCat[c.id] = c));
+
+  const proxVencer = E.gastosProximosAVencer(estado.proyectoActivo, estado.gastos, 7);
+  const ordActivas = (estado.ordenes || []).filter((o) => o.proyectoId === estado.proyectoActivo && (o.estado === 'borrador' || o.estado === 'aprobada'));
+  const contVigentes = (estado.contratos || []).filter((c) => c.proyectoId === estado.proyectoActivo && c.estado === 'vigente');
+  const topProvs = E.topProveedoresPorGasto(estado.proyectoActivo, estado.gastos, 5);
+  const porTipo = E.gastosPorTipo(estado.proyectoActivo, estado.gastos);
+  const maxTipo = Math.max.apply(null, [1].concat(porTipo.map((t) => t.monto)));
+
+  return (
+    <div className="rejilla" style={{ gap: 18 }}>
+      <div className="rejilla kpis">
+        <Kpi etq="Presupuesto" val={dinero(v.presupuesto, true)} pie={v.detalle.length + ' categorías'} onClick={() => irA('presupuesto')} />
+        <Kpi etq="Ejecutado" val={dinero(v.gastado, true)} pie={v.ejecucion + '% del presupuesto'} onClick={() => irA('gastos')} />
+        <Kpi etq={v.saldo >= 0 ? 'Disponible' : 'Sobrecosto'} val={dinero(Math.abs(v.saldo), true)}
+          pie={v.saldo >= 0 ? 'Margen restante' : 'Por encima del plan'}
+          tono={v.saldo >= 0 ? 'menta' : 'rojo'} onClick={() => irA('presupuesto')} />
+        <Kpi etq="Por pagar" val={dinero(v.porPagar, true)} pie={v.movimientos + ' movimientos'} onClick={irAGastosPendientes} />
+        <Kpi etq="Órdenes activas" val={String(ordActivas.length)} pie={ordActivas.length ? dinero(ordActivas.reduce((s,o)=>s+E.num(o.total),0), true) : 'sin órdenes'} tono="azul" onClick={() => irA('ordenes')} />
+        <Kpi etq="Contratos" val={String(contVigentes.length)} pie={contVigentes.length ? dinero(contVigentes.reduce((s,c)=>s+E.num(c.montoContrato),0), true) : 'sin contratos'} onClick={() => irA('contratos')} />
+      </div>
+
+      <div className="rejilla" style={{ gridTemplateColumns: 'minmax(260px,340px) 1fr' }}>
+        <div className="tarjeta">
+          <div className="tarjeta-cab"><h3>Ejecución financiera</h3></div>
+          <Anillo pct={v.ejecucion} estado={v.estado.id} centro={v.ejecucion + '%'} sub="Ejecutado" />
+          <div className="sep" />
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+            <span className="tenue">Pagado</span><span className="mono">{dinero(v.pagado)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginTop: 7 }}>
+            <span className="tenue">Pendiente</span><span className="mono">{dinero(v.porPagar)}</span>
+          </div>
+        </div>
+
+        <div className="tarjeta">
+          <div className="tarjeta-cab">
+            <h3>Presupuesto vs. real</h3>
+            <button className="btn btn-sm" onClick={() => irA('presupuesto')}>Ver todo</button>
+          </div>
+          {cats.length === 0 ? (
+            <Vacio icono="presupuesto" titulo="Sin presupuesto asignado" texto="Define montos por categoría."
+              accion={<button className="btn btn-p" onClick={() => irA('presupuesto')}><Icono n="mas" s={16} />Asignar</button>} />
+          ) : cats.slice(0, 6).map((d) => (
+            <div className="fila-cat" key={d.categoriaId}>
+              <div className="fila-cat-top">
+                <div className="cat-icono"><Icono n={d.icono} s={17} /></div>
+                <div className="fila-cat-nom">{d.nombre}</div>
+                <span className="mono" style={{ fontSize: 13, fontWeight: 700 }}>{d.ejecucion}%</span>
+              </div>
+              <Barra pct={d.ejecucion} estado={d.estado.id} />
+              <div className="fila-cat-cifras">
+                <span className="mono">{dinero(d.gastado, true)} <span className="tenue">de {dinero(d.presupuesto, true)}</span></span>
+                <span className={'mono ' + (d.saldo >= 0 ? 'pos' : 'neg')}>{d.saldo >= 0 ? '+' : ''}{dinero(d.saldo, true)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {proxVencer.length > 0 ? (
+        <div className="tarjeta" style={{ borderColor: 'rgba(242,112,91,.35)' }}>
+          <div className="tarjeta-cab">
+            <h3 style={{ color: 'var(--rojo)' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <Icono n="alerta" s={19} c="var(--rojo)" />Vencimientos próximos ({proxVencer.length})
+              </span>
+            </h3>
+            <button className="btn btn-sm" onClick={irAGastosPendientes}>Ver todos</button>
+          </div>
+          {proxVencer.map(({ gasto: g, dias }) => (
+            <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--borde)', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{g.descripcion || 'Sin descripción'}</div>
+                <div className="mini" style={{ marginTop: 3 }}>
+                  {fFecha(g.fechaVencimiento)}{' '}
+                  <span style={{ fontWeight: 700, color: dias < 0 ? 'var(--rojo)' : 'var(--ambar)' }}>
+                    {dias < 0 ? 'Vencida hace ' + Math.abs(dias) + 'd' : dias === 0 ? 'Vence hoy' : 'Vence en ' + dias + 'd'}
+                  </span>
+                </div>
+              </div>
+              <div className="mono" style={{ fontWeight: 700, fontSize: 14, color: 'var(--rojo)' }}>{dinero(g.monto, true)}</div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="rejilla" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))' }}>
+        <div className="tarjeta">
+          <div className="tarjeta-cab"><h3>Gasto por tipo</h3></div>
+          {porTipo.length === 0 ? <p className="mini">Sin gastos registrados.</p> :
+            porTipo.map((t) => (
+              <div key={t.tipo} style={{ padding: '8px 0', borderBottom: '1px solid var(--borde)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 5 }}>
+                  <span style={{ fontWeight: 600 }}>{t.label}</span>
+                  <span className="mono">{dinero(t.monto, true)} <span className="tenue">({t.pct}%)</span></span>
+                </div>
+                <div className="barrita"><i style={{ width: (t.monto / maxTipo * 100) + '%' }} /></div>
+              </div>
+            ))}
+        </div>
+
+        <div className="tarjeta">
+          <div className="tarjeta-cab"><h3>Top proveedores</h3></div>
+          {topProvs.length === 0 ? <p className="mini">Sin gastos registrados.</p> :
+            topProvs.map((p, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '9px 0', borderBottom: '1px solid var(--borde)' }}>
+                <span style={{ fontSize: 14, fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.proveedor}</span>
+                <span className="mono" style={{ fontWeight: 600, flexShrink: 0 }}>{dinero(p.total, true)}</span>
+              </div>
+            ))}
+        </div>
+      </div>
+
+      <div className="rejilla" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))' }}>
+        <div className="tarjeta">
+          <div className="tarjeta-cab"><h3>Señales del proyecto</h3></div>
+          {alertas.map((a, i) => (
+            <div className={'aviso a-' + a.nivel} key={i}>
+              <Icono n={a.nivel === 'ok' ? 'check' : a.nivel === 'info' ? 'info' : 'alerta'} s={17} />
+              <span>{a.texto}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="tarjeta">
+          <div className="tarjeta-cab">
+            <h3>Últimos gastos</h3>
+            <button className="btn btn-sm" onClick={() => irA('gastos')}>Ver todos</button>
+          </div>
+          {ultimos.length === 0 ? (
+            <Vacio icono="gastos" titulo="Sin gastos" texto="Registra el primer movimiento." />
+          ) : ultimos.map((g) => (
+            <div key={g.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--borde)' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.descripcion || 'Sin descripción'}</div>
+                <div className="mini">{fFecha(g.fecha)} · {(mapaCat[g.categoriaId] || {}).nombre || 'Sin categoría'}</div>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div className="mono" style={{ fontWeight: 700, fontSize: 14 }}>{dinero(g.monto, true)}</div>
+                {!g.pagado ? <div className="mini" style={{ color: 'var(--ambar)' }}>por pagar</div> : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   VISTA: PRESUPUESTO
+   ============================================================ */
+function Presupuesto({ estado, v, dinero, accion, brindar }) {
+  const [editando, setEditando] = useState(null);
+  const cats = estado.categorias.filter((c) => c.proyectoId === estado.proyectoActivo);
+  const mapaV = {};
+  v.detalle.forEach((d) => (mapaV[d.categoriaId] = d));
+
+  const abrirNueva = () => setEditando({ id: null, nombre: '', icono: 'obra_gris', fase: E.FASES[0], presupuesto: '' });
+
+  const guardarCat = () => {
+    const d = editando;
+    if (!d.nombre.trim()) return brindar('Ponle nombre a la categoría.', 'err');
+    const duplicada = estado.categorias.some((c) => c.proyectoId === estado.proyectoActivo && c.id !== d.id && c.nombre.trim().toLowerCase() === d.nombre.trim().toLowerCase());
+    if (duplicada) return brindar('Ya existe esa categoría.', 'err');
+    if (d.id) {
+      accion((s) => ({ ...s, categorias: s.categorias.map((c) => c.id === d.id ? { ...c, nombre: d.nombre.trim(), icono: d.icono, fase: d.fase, presupuesto: E.r2(d.presupuesto) } : c) }));
+      brindar('Categoría actualizada.', 'ok');
+    } else {
+      accion((s) => ({ ...s, categorias: s.categorias.concat([{ id: E.uid('ct'), proyectoId: s.proyectoActivo, nombre: d.nombre.trim(), icono: d.icono, fase: d.fase, presupuesto: E.r2(d.presupuesto) }]) }));
+      brindar('Categoría creada.', 'ok');
+    }
+    setEditando(null);
+  };
+
+  const borrarCat = (c) => {
+    if (!confirm('¿Borrar "' + c.nombre + '"?')) return;
+    accion((s) => ({ ...s, categorias: s.categorias.filter((x) => x.id !== c.id) }));
+    brindar('Categoría eliminada.', 'ok');
+  };
+
+  return (
+    <div>
+      <div className="tarjeta">
+        <div className="tarjeta-cab">
+          <h3>Presupuesto por categoría</h3>
+          <button className="btn btn-p btn-sm" onClick={abrirNueva}><Icono n="mas" s={16} />Nueva categoría</button>
+        </div>
+        {cats.length === 0 ? (
+          <Vacio icono="presupuesto" titulo="Sin categorías" texto="Crea las partidas del proyecto."
+            accion={<button className="btn btn-p" onClick={abrirNueva}><Icono n="mas" s={16} />Nueva categoría</button>} />
+        ) : (
+          <div className="tabla-cont">
+            <table>
+              <thead><tr><th>Categoría</th><th className="der">Presupuesto</th><th className="der">Ejecutado</th><th className="der">Saldo</th><th style={{width:150}}>Avance</th><th className="der">Acciones</th></tr></thead>
+              <tbody>
+                {cats.map((c) => {
+                  const d = mapaV[c.id] || { presupuesto: 0, gastado: 0, saldo: 0, ejecucion: 0, estado: E.ESTADOS.sinPresupuesto, movimientos: 0 };
+                  return (
+                    <tr key={c.id}>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div className="cat-icono"><Icono n={c.icono} s={17} /></div>
+                          <div><div style={{ fontWeight: 600 }}>{c.nombre}</div><div className="mini">{c.fase} · {d.movimientos} mov.</div></div>
+                        </div>
+                      </td>
+                      <td className="der mono">{dinero(d.presupuesto)}</td>
+                      <td className="der mono">{dinero(d.gastado)}</td>
+                      <td className={'der mono ' + (d.saldo >= 0 ? 'pos' : 'neg')}>{d.saldo >= 0 ? '+' : ''}{dinero(d.saldo)}</td>
+                      <td><Barra pct={d.ejecucion} estado={d.estado.id} /><div className="mini mono" style={{marginTop:5}}>{d.ejecucion}%</div></td>
+                      <td className="der" style={{whiteSpace:'nowrap'}}>
+                        <button className="btn-icono" onClick={() => setEditando({ ...c, presupuesto: String(c.presupuesto || '') })}><Icono n="lapiz" s={17} /></button>
+                        <button className="btn-icono" onClick={() => borrarCat(c)}><Icono n="basura" s={17} /></button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr style={{ borderTop: '2px solid var(--borde-fuerte)' }}>
+                  <td style={{ fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', fontSize: 12 }}>Total</td>
+                  <td className="der mono" style={{ fontWeight: 700 }}>{dinero(v.presupuesto)}</td>
+                  <td className="der mono" style={{ fontWeight: 700 }}>{dinero(v.gastado)}</td>
+                  <td className={'der mono ' + (v.saldo >= 0 ? 'pos' : 'neg')} style={{ fontWeight: 700 }}>{v.saldo >= 0 ? '+' : ''}{dinero(v.saldo)}</td>
+                  <td><Chip estado={v.estado.id} texto={v.ejecucion + '%'} /></td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </div>
+      {editando ? (
+        <Modal titulo={editando.id ? 'Editar categoría' : 'Nueva categoría'} onCerrar={() => setEditando(null)}
+          pie={<React.Fragment><button className="btn" onClick={() => setEditando(null)}>Cancelar</button><button className="btn btn-p" onClick={guardarCat}><Icono n="check" s={16} />Guardar</button></React.Fragment>}>
+          <Campo etq="Nombre"><input value={editando.nombre} autoFocus onChange={(e) => setEditando({ ...editando, nombre: e.target.value })} placeholder="Ej. Acabados de fachada" /></Campo>
+          <div className="dos">
+            <Campo etq="Fase"><select value={editando.fase} onChange={(e) => setEditando({ ...editando, fase: e.target.value })}>{E.FASES.map((f) => <option key={f} value={f}>{f}</option>)}</select></Campo>
+            <Campo etq="Presupuesto"><input className="mono" inputMode="decimal" value={editando.presupuesto} onChange={(e) => setEditando({ ...editando, presupuesto: e.target.value })} placeholder="0.00" /></Campo>
+          </div>
+          <Campo etq="Icono">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {E.ICONOS.map((ic) => (
+                <button key={ic} onClick={() => setEditando({ ...editando, icono: ic })}
+                  style={{ width: 42, height: 42, borderRadius: 10, display: 'grid', placeItems: 'center',
+                    background: editando.icono === ic ? 'rgba(242,169,59,.16)' : 'var(--panel-2)',
+                    color: editando.icono === ic ? 'var(--ambar)' : 'var(--texto-2)',
+                    border: '1px solid ' + (editando.icono === ic ? 'var(--ambar)' : 'transparent') }}>
+                  <Icono n={ic} s={19} />
+                </button>
+              ))}
+            </div>
+          </Campo>
+        </Modal>
+      ) : null}
+    </div>
+  );
+}
+
+/* ============================================================
+   VISTA: GASTOS
+   ============================================================ */
+function formGastoVacio(catId) {
+  return { id: E.uid('gs'), categoriaId: catId || '', fecha: E.hoy(), descripcion: '', proveedor: '', tipo: 'material', cantidad: '1', unidad: 'Unidad', precioUnitario: '', pagado: true, notas: '', fechaVencimiento: '', _esNuevo: true };
+}
+
+function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroInicial }) {
+  const [form, setForm] = useState(null);
+  const [fCat, setFCat] = useState('');
+  const [fTipo, setFTipo] = useState('');
+  const [fMes, setFMes] = useState('');
+  const [txt, setTxt] = useState('');
+  const [fotos, setFotos] = useState([]);
+  const [subiendo, setSubiendo] = useState(false);
+  const [conteoFotos, setConteoFotos] = useState({});
+  const [soloPendientes, setSoloPendientes] = useState(false);
+  const [fotoAmpliada, setFotoAmpliada] = useState(null);
+  const inputCamara = useRef(null);
+  const inputGaleria = useRef(null);
+
+  useEffect(() => {
+    if (filtroInicial === 'pendientes') { setSoloPendientes(true); if (limpiarFiltroInicial) limpiarFiltroInicial(); }
+  }, [filtroInicial]);
+
+  const cats = estado.categorias.filter((c) => c.proyectoId === estado.proyectoActivo);
+  const mapaCat = {};
+  estado.categorias.forEach((c) => (mapaCat[c.id] = c));
+
+  const refrescarConteo = () => { FOTOS.todas().then((t) => setConteoFotos(FOTOS.contarPorGasto(t))).catch(() => {}); };
+  useEffect(refrescarConteo, [estado.gastos]);
+
+  useEffect(() => {
+    if (!form) { setFotos([]); return; }
+    let vivo = true;
+    FOTOS.listarPorGasto(form.id).then((l) => { if (vivo) setFotos(l); }).catch(() => { if (vivo) setFotos([]); });
+    return () => { vivo = false; };
+  }, [form && form.id]);
+
+  useEffect(() => {
+    if (!fotoAmpliada) return;
+    const esc = (e) => { if (e.key === 'Escape') setFotoAmpliada(null); };
+    document.addEventListener('keydown', esc);
+    return () => document.removeEventListener('keydown', esc);
+  }, [fotoAmpliada]);
+
+  const todos = estado.gastos.filter((g) => g.proyectoId === estado.proyectoActivo);
+  const meses = Array.from(new Set(todos.map((g) => E.mesDe(g.fecha)).filter(Boolean))).sort().reverse();
+
+  const lista = todos
+    .filter((g) => (!fCat || g.categoriaId === fCat) && (!fTipo || g.tipo === fTipo) && (!fMes || E.mesDe(g.fecha) === fMes))
+    .filter((g) => (!soloPendientes || g.pagado === false))
+    .filter((g) => { if (!txt.trim()) return true; const q = txt.toLowerCase(); return String(g.descripcion||'').toLowerCase().includes(q) || String(g.proveedor||'').toLowerCase().includes(q); })
+    .sort((a, b) => soloPendientes ? ((a.fechaVencimiento||'') < (b.fechaVencimiento||'') ? -1 : 1) : (a.fecha < b.fecha ? 1 : -1));
+
+  const total = E.r2(lista.reduce((s, g) => s + E.num(g.monto), 0));
+  const previo = E.r2(E.num(form && form.cantidad) * E.num(form && form.precioUnitario));
+
+  const cerrarForm = () => { if (form && form._esNuevo) FOTOS.eliminarPorGasto(form.id).catch(() => {}); setForm(null); };
+
+  const agregarFotos = async (archivos) => {
+    if (!archivos || archivos.length === 0) return;
+    setSubiendo(true);
+    try {
+      for (const archivo of Array.from(archivos)) {
+        if (!FOTOS.puedeAgregarMas(fotos)) { brindar('Máximo ' + FOTOS.MAX_FOTOS_POR_GASTO + ' fotos.', 'err'); break; }
+        if (!/^image\//.test(archivo.type)) { brindar('"' + archivo.name + '" no es una imagen.', 'err'); continue; }
+        try {
+          const { dataURL, ancho, alto } = await FOTOS.comprimirArchivo(archivo);
+          const registro = await FOTOS.guardar(form.id, dataURL, ancho, alto);
+          setFotos((f) => f.concat([registro]));
+        } catch (e) { brindar('No se pudo procesar la imagen.', 'err'); }
+      }
+    } finally { setSubiendo(false); refrescarConteo(); }
+  };
+
+  const quitarFoto = (id) => { FOTOS.eliminar(id).then(() => { setFotos((f) => f.filter((x) => x.id !== id)); refrescarConteo(); }).catch(() => brindar('Error al borrar foto.', 'err')); };
+
+  const guardarGasto = () => {
+    if (!form.categoriaId) return brindar('Elige una categoría.', 'err');
+    if (!form.descripcion.trim()) return brindar('Describe el gasto.', 'err');
+    if (E.num(form.precioUnitario) <= 0) return brindar('El precio unitario debe ser mayor a cero.', 'err');
+    const limpio = E.normalizarGasto({ id: form.id, proyectoId: estado.proyectoActivo, categoriaId: form.categoriaId, fecha: form.fecha, descripcion: form.descripcion.trim(), proveedor: form.proveedor.trim(), tipo: form.tipo, cantidad: form.cantidad, unidad: form.unidad, precioUnitario: form.precioUnitario, pagado: form.pagado, notas: form.notas, fechaVencimiento: form.fechaVencimiento, creado: form.creado });
+    accion((s) => ({ ...s, gastos: form._esNuevo ? s.gastos.concat([limpio]) : s.gastos.map((g) => g.id === form.id ? limpio : g) }));
+    brindar(form._esNuevo ? 'Gasto registrado.' : 'Gasto actualizado.', 'ok');
+    setForm(null); refrescarConteo();
+  };
+
+  const borrarGasto = (g) => {
+    if (!confirm('¿Borrar "' + (g.descripcion || '') + '"?')) return;
+    accion((s) => ({ ...s, gastos: s.gastos.filter((x) => x.id !== g.id) }));
+    FOTOS.eliminarPorGasto(g.id).then(refrescarConteo).catch(() => {});
+    brindar('Gasto eliminado.', 'ok');
+  };
+
+  const alternarPago = (g) => { accion((s) => ({ ...s, gastos: s.gastos.map((x) => x.id === g.id ? { ...x, pagado: !x.pagado } : x) })); };
+
+  const UNIDADES = ['Unidad', 'm²', 'm³', 'Libras', 'Bolsa', 'Caja', 'Global', 'Jornal', 'qq', 'ml', 'L'];
+
+  return (
+    <div>
+      {fotoAmpliada ? (
+        <div onMouseDown={(e) => { if (e.target === e.currentTarget) setFotoAmpliada(null); }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.92)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <img src={fotoAmpliada} alt="Factura" style={{ maxWidth: '90vw', maxHeight: '85vh', borderRadius: 12, objectFit: 'contain' }} />
+          <button onClick={() => setFotoAmpliada(null)} style={{ position: 'fixed', top: 18, right: 18, width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,.12)', border: '1px solid rgba(255,255,255,.22)', display: 'grid', placeItems: 'center', color: '#fff' }}>
+            <Icono n="equis" s={20} c="#fff" />
+          </button>
+        </div>
+      ) : null}
+
+      <div className="tarjeta">
+        <div className="tarjeta-cab">
+          <h3>Movimientos</h3>
+          <button className="btn btn-p btn-sm" onClick={() => setForm(formGastoVacio(fCat || (cats[0] || {}).id))}><Icono n="mas" s={16} />Registrar gasto</button>
+        </div>
+        <div className="filtros">
+          <input placeholder="Buscar…" value={txt} onChange={(e) => setTxt(e.target.value)} />
+          <select value={fCat} onChange={(e) => setFCat(e.target.value)}><option value="">Todas</option>{cats.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select>
+          <select value={fTipo} onChange={(e) => setFTipo(e.target.value)}><option value="">Todo tipo</option>{E.TIPOS_GASTO.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}</select>
+          <select value={fMes} onChange={(e) => setFMes(e.target.value)}><option value="">Todo el periodo</option>{meses.map((m) => <option key={m} value={m}>{E.nombreMes(m)}</option>)}</select>
+        </div>
+        {soloPendientes ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '0 0 12px', padding: '9px 12px', background: 'rgba(242,169,59,.1)', border: '1px solid rgba(242,169,59,.3)', borderRadius: 10 }}>
+            <Icono n="reloj" s={16} c="var(--ambar)" />
+            <span style={{ fontSize: 13.5, color: 'var(--ambar-claro)', flex: 1 }}>Mostrando solo pendientes de pago</span>
+            <button className="btn btn-sm" onClick={() => setSoloPendientes(false)}>Quitar filtro</button>
+          </div>
+        ) : null}
+        {lista.length === 0 ? (
+          <Vacio icono="gastos" titulo="No hay gastos" texto="Ajusta filtros o registra el primero."
+            accion={<button className="btn btn-p" onClick={() => setForm(formGastoVacio((cats[0]||{}).id))}><Icono n="mas" s={16} />Registrar</button>} />
+        ) : (
+          <React.Fragment>
+            <div className="tabla-cont">
+              <table>
+                <thead><tr><th style={{width:78}}>Fecha</th><th>Detalle</th><th>Categoría</th><th className="der">Monto</th><th>Vence</th><th className="cen">Foto</th><th className="cen">Pagado</th><th className="der"></th></tr></thead>
+                <tbody>
+                  {lista.map((g) => {
+                    const c = mapaCat[g.categoriaId];
+                    const nFotos = conteoFotos[g.id] || 0;
+                    const dias = g.fechaVencimiento ? E.diasHasta(g.fechaVencimiento) : null;
+                    return (
+                      <tr key={g.id}>
+                        <td className="mono" style={{fontSize:13}}>{fFecha(g.fecha)}</td>
+                        <td>
+                          <div style={{fontWeight:600}}>{g.descripcion || 'Sin descripción'}</div>
+                          <div className="mini">{g.proveedor || 'Sin proveedor'} · {(E.TIPOS_GASTO.find((t)=>t.id===g.tipo)||{label:'Otro'}).label}</div>
+                        </td>
+                        <td>{c ? <span style={{display:'inline-flex',alignItems:'center',gap:7}}><Icono n={c.icono} s={15} c="var(--ambar)" /><span style={{fontSize:13.5}}>{c.nombre}</span></span> : <Chip estado="excedido" texto="Sin cat." />}</td>
+                        <td className="der mono" style={{fontWeight:700}}>{dinero(g.monto)}</td>
+                        <td>
+                          {!g.pagado && g.fechaVencimiento ? (
+                            <span className="mono" style={{fontSize:12.5,fontWeight:dias!==null&&dias<=3?700:400,color:dias<0?'var(--rojo)':dias<=3?'var(--ambar)':undefined}}>
+                              {fFecha(g.fechaVencimiento)} {dias!==null?'('+dias+'d)':''}
+                            </span>
+                          ) : <span className="tenue" style={{fontSize:12}}>—</span>}
+                        </td>
+                        <td className="cen">
+                          <button className="btn-icono" onClick={() => setForm({...g,cantidad:String(g.cantidad),precioUnitario:String(g.precioUnitario),descripcion:g.descripcion||'',proveedor:g.proveedor||'',notas:g.notas||'',_esNuevo:false})}>
+                            <Icono n="camara" s={17} c={nFotos?'var(--ambar)':'var(--texto-3)'} />
+                          </button>
+                          {nFotos > 0 ? <span className="mini mono">{nFotos}</span> : null}
+                        </td>
+                        <td className="cen">
+                          <button className="btn-icono" onClick={() => alternarPago(g)}>
+                            <Icono n={g.pagado ? 'check' : 'reloj'} s={18} c={g.pagado ? 'var(--menta)' : 'var(--ambar)'} />
+                          </button>
+                        </td>
+                        <td className="der" style={{whiteSpace:'nowrap'}}>
+                          <button className="btn-icono" onClick={() => setForm({...g,cantidad:String(g.cantidad),precioUnitario:String(g.precioUnitario),descripcion:g.descripcion||'',proveedor:g.proveedor||'',notas:g.notas||'',_esNuevo:false})}><Icono n="lapiz" s={17} /></button>
+                          <button className="btn-icono" onClick={() => borrarGasto(g)}><Icono n="basura" s={17} /></button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, paddingTop: 14, borderTop: '2px solid var(--borde-fuerte)' }}>
+              <span className="mini">{lista.length} movimiento(s)</span>
+              <span className="mono" style={{ fontSize: 18, fontWeight: 700 }}>{dinero(total)}</span>
+            </div>
+          </React.Fragment>
+        )}
+      </div>
+
+      {form ? (
+        <Modal titulo={form._esNuevo ? 'Registrar gasto' : 'Editar gasto'} onCerrar={cerrarForm}
+          pie={<React.Fragment><button className="btn" onClick={cerrarForm}>Cancelar</button><button className="btn btn-p" onClick={guardarGasto}><Icono n="check" s={16} />Guardar</button></React.Fragment>}>
+          <Campo etq="Descripción"><input value={form.descripcion} autoFocus placeholder="Ej. Cemento gris" onChange={(e) => setForm({...form,descripcion:e.target.value})} /></Campo>
+          <div className="dos">
+            <Campo etq="Categoría"><select value={form.categoriaId} onChange={(e) => setForm({...form,categoriaId:e.target.value})}><option value="">Elegir…</option>{cats.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select></Campo>
+            <Campo etq="Tipo"><select value={form.tipo} onChange={(e) => setForm({...form,tipo:e.target.value})}>{E.TIPOS_GASTO.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}</select></Campo>
+          </div>
+          <div className="dos">
+            <Campo etq="Fecha"><input type="date" value={form.fecha} onChange={(e) => setForm({...form,fecha:e.target.value})} /></Campo>
+            <Campo etq="Proveedor"><CampoProveedor valor={form.proveedor} onChange={(v) => setForm({...form,proveedor:v})} proveedores={estado.proveedores} accion={accion} brindar={brindar} /></Campo>
+          </div>
+          <div className="tres">
+            <Campo etq="Cantidad"><input className="mono" inputMode="decimal" value={form.cantidad} onChange={(e) => setForm({...form,cantidad:e.target.value})} /></Campo>
+            <Campo etq="Unidad"><select value={UNIDADES.includes(form.unidad)?form.unidad:'Unidad'} onChange={(e)=>setForm({...form,unidad:e.target.value})}>{UNIDADES.map((u)=><option key={u}>{u}</option>)}</select></Campo>
+            <Campo etq="Precio unitario"><input className="mono" inputMode="decimal" value={form.precioUnitario} placeholder="0.00" onChange={(e) => setForm({...form,precioUnitario:e.target.value})} /></Campo>
+          </div>
+          <div style={{ display:'flex',justifyContent:'space-between',alignItems:'center',background:'var(--panel-2)',borderRadius:10,padding:'12px 14px',marginBottom:14 }}>
+            <span style={{fontSize:12,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--texto-3)',fontWeight:700}}>Monto</span>
+            <span className="mono" style={{fontSize:20,fontWeight:700,color:'var(--ambar)'}}>{dinero(previo)}</span>
+          </div>
+          <label className="interruptor" style={{marginBottom:form.pagado?18:10}}>
+            <input type="checkbox" checked={form.pagado} onChange={(e) => setForm({...form,pagado:e.target.checked,fechaVencimiento:e.target.checked?'':form.fechaVencimiento})} />
+            <span className="pista-sw" /><span>Ya está pagado</span>
+          </label>
+          {!form.pagado ? <Campo etq="Vence el"><input type="date" value={form.fechaVencimiento||''} onChange={(e) => setForm({...form,fechaVencimiento:e.target.value})} /></Campo> : null}
+          <Campo etq={'Fotos (' + fotos.length + '/' + FOTOS.MAX_FOTOS_POR_GASTO + ')'}>
+            <div style={{display:'flex',flexWrap:'wrap',gap:9}}>
+              {fotos.map((f) => (
+                <div key={f.id} style={{position:'relative',width:68,height:68,borderRadius:10,overflow:'hidden',border:'1px solid var(--borde)'}}>
+                  <img src={f.dataURL} alt="Factura" style={{width:'100%',height:'100%',objectFit:'cover',cursor:'zoom-in'}} onClick={() => setFotoAmpliada(f.dataURL)} />
+                  <button onClick={() => quitarFoto(f.id)} style={{position:'absolute',top:2,right:2,width:20,height:20,borderRadius:'50%',background:'rgba(8,17,19,.85)',display:'grid',placeItems:'center'}}><Icono n="equis" s={12} c="#fff" /></button>
+                </div>
+              ))}
+              {FOTOS.puedeAgregarMas(fotos) ? (
+                <React.Fragment>
+                  <button onClick={() => inputCamara.current && inputCamara.current.click()} disabled={subiendo} style={{width:68,height:68,borderRadius:10,border:'1px dashed var(--borde-fuerte)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,color:'var(--texto-2)'}}><Icono n="camara" s={19} /><span style={{fontSize:10}}>Cámara</span></button>
+                  <button onClick={() => inputGaleria.current && inputGaleria.current.click()} disabled={subiendo} style={{width:68,height:68,borderRadius:10,border:'1px dashed var(--borde-fuerte)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,color:'var(--texto-2)'}}><Icono n="ofertas" s={19} /><span style={{fontSize:10}}>Galería</span></button>
+                </React.Fragment>
+              ) : null}
+            </div>
+            <input ref={inputCamara} type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={(e) => {agregarFotos(e.target.files);e.target.value='';}} />
+            <input ref={inputGaleria} type="file" accept="image/*" multiple style={{display:'none'}} onChange={(e) => {agregarFotos(e.target.files);e.target.value='';}} />
+            <div className="mini" style={{marginTop:8}}>Se guarda en este dispositivo, comprimida.</div>
+          </Campo>
+          <Campo etq="Notas"><textarea value={form.notas} onChange={(e) => setForm({...form,notas:e.target.value})} placeholder="Detalles, número de factura…" /></Campo>
+        </Modal>
+      ) : null}
+    </div>
+  );
+}
+
+/* ============================================================
+   VISTA: OFERTAS (COMPARATIVO)
+   ============================================================ */
+function articuloVacio() { return { id: E.uid('ar'), descripcion: '', cantidad: '1', unidad: 'unidad' }; }
+function ofertaVacia(articulos) {
+  return { id: E.uid('of'), proveedor: '', precios: (articulos || []).map((a) => ({ articuloId: a.id, precioUnitario: '' })), total: '', dias: '', calidad: '3', garantia: '', notas: '' };
+}
+function licVacia(proyectoId, catId) {
+  const arts = [articuloVacio()];
+  return { id: null, proyectoId, categoriaId: catId || '', titulo: '', articulos: arts, notas: '', pesos: { ...E.PESOS_DEFECTO }, ofertas: [ofertaVacia(arts), ofertaVacia(arts), ofertaVacia(arts)], adjudicadaA: null };
+}
+
+function Ofertas({ estado, dinero, accion, brindar }) {
+  const [form, setForm] = useState(null);
+  const [abierta, setAbierta] = useState(null);
+  const cats = estado.categorias.filter((c) => c.proyectoId === estado.proyectoActivo);
+  const mapaCat = {}; estado.categorias.forEach((c) => (mapaCat[c.id] = c));
+  const lics = estado.licitaciones.filter((l) => l.proyectoId === estado.proyectoActivo);
+
+  const guardarLic = () => {
+    if (!form.titulo.trim()) return brindar('Ponle título.', 'err');
+    const articulos = (form.articulos || []).filter((a) => a.descripcion.trim()).map((a) => ({ id: a.id, descripcion: a.descripcion.trim(), cantidad: E.num(a.cantidad), unidad: a.unidad || 'unidad' }));
+    if (articulos.length === 0) return brindar('Agrega al menos un artículo.', 'err');
+    const ofertas = form.ofertas.filter((o) => String(o.proveedor||'').trim() || E.num(o.total) > 0 || (o.precios||[]).some((p) => E.num(p.precioUnitario) > 0))
+      .map((o) => ({ id: o.id, proveedor: String(o.proveedor||'').trim()||'Sin nombre', precios: (o.precios||[]).map((p) => ({ articuloId: p.articuloId, precioUnitario: E.r2(p.precioUnitario) })), total: E.r2(o.total), dias: E.num(o.dias), calidad: E.num(o.calidad), garantia: E.num(o.garantia), notas: o.notas||'' }));
+    if (ofertas.length === 0) return brindar('Ingresa al menos una oferta con precio.', 'err');
+    const lic = { id: form.id || E.uid('li'), proyectoId: estado.proyectoActivo, categoriaId: form.categoriaId, titulo: form.titulo.trim(), articulos, notas: form.notas, pesos: { precio: E.num(form.pesos.precio), calidad: E.num(form.pesos.calidad), tiempo: E.num(form.pesos.tiempo), garantia: E.num(form.pesos.garantia) }, ofertas, adjudicadaA: ofertas.some((o)=>o.id===form.adjudicadaA)?form.adjudicadaA:null, creado: form.creado || new Date().toISOString() };
+    accion((s) => ({ ...s, licitaciones: form.id ? s.licitaciones.map((l) => l.id === form.id ? lic : l) : s.licitaciones.concat([lic]) }));
+    brindar(form.id ? 'Actualizado.' : 'Creado.', 'ok');
+    setAbierta(lic.id); setForm(null);
+  };
+
+  const borrarLic = (l) => { if (!confirm('¿Borrar "' + l.titulo + '"?')) return; accion((s) => ({ ...s, licitaciones: s.licitaciones.filter((x) => x.id !== l.id) })); brindar('Eliminado.', 'ok'); };
+  const adjudicar = (l, ofertaId) => { accion((s) => ({ ...s, licitaciones: s.licitaciones.map((x) => x.id === l.id ? { ...x, adjudicadaA: x.adjudicadaA === ofertaId ? null : ofertaId } : x) })); };
+
+  const editarLic = (l) => {
+    const arts = (l.articulos || []).length > 0
+      ? (l.articulos||[]).map((a) => ({ id: a.id||E.uid('ar'), descripcion: a.descripcion||'', cantidad: String(a.cantidad||1), unidad: a.unidad||'unidad' }))
+      : [{ id: E.uid('ar'), descripcion: l.titulo||'', cantidad: String(l.cantidad||1), unidad: l.unidad||'unidad' }];
+    const previas = (l.ofertas||[]).map((o) => ({
+      id: o.id||E.uid('of'), proveedor: o.proveedor||'',
+      precios: arts.map((a) => {
+        const existente = (o.precios||[]).find((p) => p.articuloId === a.id);
+        return { articuloId: a.id, precioUnitario: String(existente ? existente.precioUnitario : (o.precioUnitario||'')) };
+      }),
+      total: String(o.total||''), dias: String(o.dias||''), calidad: String(o.calidad||''), garantia: String(o.garantia||''), notas: o.notas||''
+    }));
+    while (previas.length < 3) previas.push(ofertaVacia(arts));
+    setForm({ ...l, titulo: l.titulo||'', articulos: arts, notas: l.notas||'', pesos: { ...E.PESOS_DEFECTO, ...(l.pesos||{}) }, ofertas: previas });
+  };
+
+  return (
+    <div>
+      <div className="tarjeta-cab" style={{marginBottom:16}}>
+        <div>
+          <h3 style={{fontSize:18}}>Comparativo de ofertas</h3>
+          <div className="mini" style={{marginTop:4}}>Ingresa propuestas por partida. El sistema marca la más económica y mejor relación valor/precio.</div>
+        </div>
+        <button className="btn btn-p btn-sm" onClick={() => setForm(licVacia(estado.proyectoActivo,(cats[0]||{}).id))}><Icono n="mas" s={16} />Nuevo comparativo</button>
+      </div>
+      {lics.length === 0 ? (
+        <div className="tarjeta"><Vacio icono="ofertas" titulo="Sin comparativos" texto="Crea uno para comparar proveedores."
+          accion={<button className="btn btn-p" onClick={() => setForm(licVacia(estado.proyectoActivo,(cats[0]||{}).id))}><Icono n="mas" s={16} />Nuevo</button>} /></div>
+      ) : (
+        <div className="rejilla" style={{gap:14}}>
+          {lics.map((l) => {
+            const r = E.compararOfertas(l);
+            const cat = mapaCat[l.categoriaId];
+            const expandida = abierta === l.id;
+            return (
+              <div className="tarjeta" key={l.id}>
+                <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'flex-start',flexWrap:'wrap'}}>
+                  <div style={{display:'flex',gap:11,minWidth:0,flex:1}}>
+                    <div className="cat-icono"><Icono n={cat?cat.icono:'ofertas'} s={17} /></div>
+                    <div style={{minWidth:0}}>
+                      <div style={{fontWeight:700,fontSize:15.5}}>{l.titulo}</div>
+                      <div className="mini">{cat?cat.nombre:'Sin categoría'} · {(l.articulos||[]).length || 1} artículo(s) · {(l.ofertas||[]).length} oferta(s)</div>
+                    </div>
+                  </div>
+                  <div style={{display:'flex',gap:4,alignItems:'center'}}>
+                    <button className="btn-icono" onClick={() => editarLic(l)}><Icono n="lapiz" s={17} /></button>
+                    <button className="btn-icono" onClick={() => borrarLic(l)}><Icono n="basura" s={17} /></button>
+                    <button className="btn btn-sm" onClick={() => setAbierta(expandida?null:l.id)}><Icono n={expandida?'abajo':'derecha'} s={15} />{expandida?'Ocultar':'Comparar'}</button>
+                  </div>
+                </div>
+                {r.resumen ? (
+                  <div className="rejilla" style={{gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:10,marginTop:15}}>
+                    <div style={{background:'var(--panel-2)',borderRadius:10,padding:'10px 12px'}}><div className="mini">Más económica</div><div style={{fontWeight:700,fontSize:13.5,marginTop:3}}>{r.resumen.economica.proveedor}</div><div className="mono pos" style={{fontSize:13}}>{dinero(r.resumen.minTotal,true)}</div></div>
+                    <div style={{background:'var(--panel-2)',borderRadius:10,padding:'10px 12px'}}><div className="mini">Mejor valor</div><div style={{fontWeight:700,fontSize:13.5,marginTop:3}}>{r.resumen.mejorValor.proveedor}</div><div className="mono" style={{fontSize:13,color:'var(--ambar)'}}>{r.resumen.mejorValor.puntaje} pts</div></div>
+                    <div style={{background:'var(--panel-2)',borderRadius:10,padding:'10px 12px'}}><div className="mini">Brecha</div><div className="mono" style={{fontWeight:700,fontSize:13.5,marginTop:3}}>{dinero(r.resumen.rango,true)}</div><div className="mini">{r.resumen.rangoPct}%</div></div>
+                    <div style={{background:'var(--panel-2)',borderRadius:10,padding:'10px 12px'}}><div className="mini">Adjudicada</div><div style={{fontWeight:700,fontSize:13.5,marginTop:3}}>{r.resumen.adjudicada?r.resumen.adjudicada.proveedor:'Pendiente'}</div></div>
+                  </div>
+                ) : <div className="aviso a-info" style={{marginTop:14}}><Icono n="info" s={17} /><span>Sin ofertas con precio.</span></div>}
+                {expandida && r.resumen ? (
+                  <React.Fragment>
+                    <div className="sep" />
+                    <div className="tabla-cont">
+                      <table>
+                        <thead><tr><th>Proveedor</th><th className="der">P.U.</th><th className="der">Total</th><th className="cen">Entrega</th><th className="cen">Calidad</th><th style={{width:100}}>Puntaje</th><th className="der">Acción</th></tr></thead>
+                        <tbody>
+                          {r.ofertas.map((o) => (
+                            <tr key={o.id} className={o.esMejorValor?'ganadora':''}>
+                              <td>
+                                <div style={{fontWeight:600}}>{o.proveedor}</div>
+                                <div style={{display:'flex',gap:5,flexWrap:'wrap',marginTop:4}}>
+                                  {o.esEconomica?<Chip estado="sano" texto="Más barata" />:null}
+                                  {o.esMejorValor?<Chip estado="alerta" texto="Mejor valor" />:null}
+                                  {o.esAdjudicada?<Chip estado="neutro" texto="Adjudicada" />:null}
+                                </div>
+                              </td>
+                              <td className="der mono">{dinero(o.precioUnitario)}</td>
+                              <td className="der mono" style={{fontWeight:700}}>{dinero(o.total)}</td>
+                              <td className="cen mono">{o.dias>0?o.dias+'d':'—'}</td>
+                              <td className="cen mono">{o.calidad>0?o.calidad+'/5':'—'}</td>
+                              <td><div className="mono" style={{fontWeight:700,fontSize:14}}>{o.puntaje}</div><div className="barrita"><i style={{width:o.puntaje+'%'}} /></div></td>
+                              <td className="der" style={{whiteSpace:'nowrap'}}>
+                                <button className="btn btn-sm" onClick={() => adjudicar(l,o.id)}>{o.esAdjudicada?'Quitar':'Adjudicar'}</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </React.Fragment>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {form ? (
+        <Modal ancho={720} titulo={form.id?'Editar comparativo':'Nuevo comparativo'} onCerrar={() => setForm(null)}
+          pie={<React.Fragment><button className="btn" onClick={() => setForm(null)}>Cancelar</button><button className="btn btn-p" onClick={guardarLic}><Icono n="check" s={16} />Guardar</button></React.Fragment>}>
+          <div className="dos">
+            <Campo etq="Título del comparativo"><input value={form.titulo} autoFocus placeholder="Ej. Materiales de piso" onChange={(e) => setForm({...form,titulo:e.target.value})} /></Campo>
+            <Campo etq="Categoría"><select value={form.categoriaId} onChange={(e) => setForm({...form,categoriaId:e.target.value})}><option value="">Sin asignar</option>{cats.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select></Campo>
+          </div>
+          <div style={{fontSize:11,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--texto-3)',fontWeight:700,marginBottom:10}}>Artículos a cotizar</div>
+          {(form.articulos||[]).map((art,ai) => (
+            <div key={art.id} style={{display:'flex',gap:8,alignItems:'flex-end',marginBottom:8,flexWrap:'wrap'}}>
+              <div style={{flex:2,minWidth:120}}><input value={art.descripcion} placeholder="Descripción" style={{background:'var(--fondo-2)',border:'1px solid var(--borde)',borderRadius:9,padding:'9px 10px',color:'var(--texto)',width:'100%',fontSize:14}} onChange={(e) => setForm({...form,articulos:form.articulos.map((a,j)=>j===ai?{...a,descripcion:e.target.value}:a)})} /></div>
+              <div style={{width:70}}><input className="mono" value={art.cantidad} placeholder="Cant." style={{background:'var(--fondo-2)',border:'1px solid var(--borde)',borderRadius:9,padding:'9px 10px',color:'var(--texto)',width:'100%',fontSize:14}} onChange={(e) => setForm({...form,articulos:form.articulos.map((a,j)=>j===ai?{...a,cantidad:e.target.value}:a)})} /></div>
+              <div style={{width:80}}><input value={art.unidad} placeholder="Unidad" style={{background:'var(--fondo-2)',border:'1px solid var(--borde)',borderRadius:9,padding:'9px 10px',color:'var(--texto)',width:'100%',fontSize:14}} onChange={(e) => setForm({...form,articulos:form.articulos.map((a,j)=>j===ai?{...a,unidad:e.target.value}:a)})} /></div>
+              {(form.articulos||[]).length > 1 ? <button className="btn-icono" onClick={() => {
+                const nuevosArts = form.articulos.filter((_,j)=>j!==ai);
+                const artId = art.id;
+                setForm({...form, articulos: nuevosArts, ofertas: form.ofertas.map((o) => ({...o, precios: (o.precios||[]).filter((p) => p.articuloId !== artId)}))});
+              }}><Icono n="equis" s={16} /></button> : null}
+            </div>
+          ))}
+          <button className="btn btn-sm" style={{marginBottom:14}} onClick={() => {
+            const nuevoArt = articuloVacio();
+            setForm({...form, articulos: (form.articulos||[]).concat([nuevoArt]), ofertas: form.ofertas.map((o) => ({...o, precios: (o.precios||[]).concat([{articuloId: nuevoArt.id, precioUnitario: ''}])}))});
+          }}><Icono n="mas" s={15} />Agregar artículo</button>
+          <div style={{background:'var(--panel-2)',borderRadius:12,padding:14,marginBottom:16}}>
+            <div style={{fontSize:11,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--texto-3)',fontWeight:700,marginBottom:10}}>Peso de cada criterio</div>
+            {[['precio','Precio'],['calidad','Calidad'],['tiempo','Entrega'],['garantia','Garantía']].map(([k,etq]) => (
+              <div key={k} style={{marginBottom:9}}>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:4}}><span>{etq}</span><span className="mono" style={{color:'var(--ambar)'}}>{form.pesos[k]}</span></div>
+                <input type="range" min="0" max="100" step="5" value={form.pesos[k]} onChange={(e) => setForm({...form,pesos:{...form.pesos,[k]:Number(e.target.value)}})} />
+              </div>
+            ))}
+          </div>
+          <div style={{fontSize:11,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--texto-3)',fontWeight:700,marginBottom:10}}>Ofertas recibidas</div>
+          {form.ofertas.map((o,i) => (
+            <div key={o.id} style={{border:'1px solid var(--borde)',borderRadius:12,padding:13,marginBottom:11}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:9}}>
+                <span className="mono" style={{fontSize:11,color:'var(--texto-3)'}}>OFERTA {i+1}</span>
+                {form.ofertas.length > 1 ? <button className="btn-icono" onClick={() => setForm({...form,ofertas:form.ofertas.filter((_,j)=>j!==i)})}><Icono n="equis" s={16} /></button> : null}
+              </div>
+              <Campo etq="Proveedor"><CampoProveedor valor={o.proveedor} onChange={(v) => setForm({...form,ofertas:form.ofertas.map((x,j)=>j===i?{...x,proveedor:v}:x)})} proveedores={estado.proveedores} accion={accion} brindar={brindar} /></Campo>
+              {(form.articulos||[]).map((art, pi) => {
+                const precio = (o.precios||[]).find((p) => p.articuloId === art.id);
+                const pu = precio ? precio.precioUnitario : '';
+                return (
+                  <div key={art.id} style={{display:'flex',gap:8,alignItems:'center',marginBottom:4}}>
+                    <span style={{flex:1,fontSize:12.5,color:'var(--texto-3)'}}>{art.descripcion || 'Artículo ' + (pi+1)} ({art.cantidad} {art.unidad})</span>
+                    <input className="mono" style={{width:100,background:'var(--fondo-2)',border:'1px solid var(--borde)',borderRadius:9,padding:'7px 10px',color:'var(--texto)',fontSize:13}} inputMode="decimal" value={pu} placeholder="P.U." onChange={(e) => {
+                      const nuevosPrecios = (o.precios||[]).map((p) => p.articuloId === art.id ? {...p, precioUnitario: e.target.value} : p);
+                      if (!nuevosPrecios.some((p) => p.articuloId === art.id)) nuevosPrecios.push({articuloId: art.id, precioUnitario: e.target.value});
+                      setForm({...form, ofertas: form.ofertas.map((x,j) => j===i ? {...x, precios: nuevosPrecios} : x)});
+                    }} />
+                    <span className="mono" style={{width:70,fontSize:12,textAlign:'right',fontWeight:600}}>{dinero(E.r2(E.num(pu)*E.num(art.cantidad)),true)}</span>
+                  </div>
+                );
+              })}
+              <Campo etq="Total global (opcional)"><input className="mono" inputMode="decimal" value={o.total} placeholder="Dejar vacío para calcular" onChange={(e) => setForm({...form,ofertas:form.ofertas.map((x,j)=>j===i?{...x,total:e.target.value}:x)})} /></Campo>
+              <div className="tres">
+                <Campo etq="Días entrega"><input className="mono" inputMode="numeric" value={o.dias} onChange={(e) => setForm({...form,ofertas:form.ofertas.map((x,j)=>j===i?{...x,dias:e.target.value}:x)})} /></Campo>
+                <Campo etq="Calidad (1-5)"><select value={o.calidad} onChange={(e) => setForm({...form,ofertas:form.ofertas.map((x,j)=>j===i?{...x,calidad:e.target.value}:x)})}><option value="">—</option>{[1,2,3,4,5].map((n)=><option key={n} value={n}>{n}</option>)}</select></Campo>
+                <Campo etq="Garantía (meses)"><input className="mono" inputMode="numeric" value={o.garantia} onChange={(e) => setForm({...form,ofertas:form.ofertas.map((x,j)=>j===i?{...x,garantia:e.target.value}:x)})} /></Campo>
+              </div>
+            </div>
+          ))}
+          {form.ofertas.length < 6 ? <button className="btn btn-sm" onClick={() => setForm({...form,ofertas:form.ofertas.concat([ofertaVacia(form.articulos)])})}><Icono n="mas" s={15} />Agregar oferta</button> : null}
+          <Campo etq="Notas"><textarea value={form.notas} onChange={(e) => setForm({...form,notas:e.target.value})} /></Campo>
+        </Modal>
+      ) : null}
+    </div>
+  );
+}
+
+/* ============================================================
+   VISTA: ÓRDENES DE COMPRA
+   ============================================================ */
+function itemVacio() { return { id: E.uid('it'), descripcion: '', marca: '', cantidad: '1', unidad: 'Unidad', precioUnitario: '' }; }
+
+function Ordenes({ estado, dinero, accion, brindar }) {
+  const [form, setForm] = useState(null);
+  const [fEstado, setFEstado] = useState('');
+  const cats = estado.categorias.filter((c) => c.proyectoId === estado.proyectoActivo);
+  const ordenes = (estado.ordenes || []).filter((o) => o.proyectoId === estado.proyectoActivo && (!fEstado || o.estado === fEstado))
+    .sort((a, b) => a.fecha < b.fecha ? 1 : -1);
+
+  const CHIP_ORDEN = { borrador: 'sinPresupuesto', aprobada: 'alerta', recibida: 'sano', cancelada: 'excedido' };
+  const ETQ_ORDEN = { borrador: 'Borrador', aprobada: 'Aprobada', recibida: 'Recibida', cancelada: 'Cancelada' };
+
+  const abrirNueva = () => setForm({ id: null, numero: 'OC-' + String(Date.now()).slice(-5), categoriaId: (cats[0]||{}).id||'', proveedor: '', fecha: E.hoy(), fechaEntrega: '', items: [itemVacio(), itemVacio()], impuesto: '0', retencionIR: false, estado: 'borrador', notas: '' });
+
+  const subForm = () => {
+    if (!form) return 0;
+    return form.items.reduce((s, it) => s + E.r2(E.num(it.cantidad) * E.num(it.precioUnitario)), 0);
+  };
+  const totalForm = () => {
+    if (!form) return 0;
+    const sub = subForm();
+    const imp = E.r2(sub * E.num(form.impuesto) / 100);
+    const ret = form.retencionIR ? E.r2(sub * 0.02) : 0;
+    return E.r2(sub + imp - ret);
+  };
+
+  const guardarOrden = () => {
+    if (!form.proveedor.trim()) return brindar('Indica el proveedor.', 'err');
+    const items = form.items.filter((it) => it.descripcion.trim() && E.num(it.precioUnitario) > 0);
+    if (items.length === 0) return brindar('Agrega al menos un ítem con precio.', 'err');
+    const orden = E.normalizarOrden({ id: form.id || E.uid('oc'), proyectoId: estado.proyectoActivo, categoriaId: form.categoriaId, numero: form.numero, proveedor: form.proveedor.trim(), fecha: form.fecha, fechaEntrega: form.fechaEntrega, items: items.map((it) => ({ id: it.id, descripcion: it.descripcion.trim(), marca: (it.marca||'').trim(), cantidad: E.num(it.cantidad), unidad: it.unidad || 'Unidad', precioUnitario: E.r2(it.precioUnitario) })), impuesto: E.num(form.impuesto), retencionIR: !!form.retencionIR, estado: form.estado, notas: form.notas, creado: form.creado });
+    accion((s) => ({ ...s, ordenes: form.id ? (s.ordenes||[]).map((o) => o.id === form.id ? orden : o) : (s.ordenes||[]).concat([orden]) }));
+    brindar(form.id ? 'Orden actualizada.' : 'Orden creada.', 'ok');
+    setForm(null);
+  };
+
+  const cambiarEstadoOrden = (o, nuevoEstado) => {
+    accion((s) => ({ ...s, ordenes: (s.ordenes||[]).map((x) => x.id === o.id ? { ...x, estado: nuevoEstado } : x) }));
+    brindar('Orden ' + ETQ_ORDEN[nuevoEstado].toLowerCase() + '.', 'ok');
+  };
+
+  const borrarOrden = (o) => {
+    if (!confirm('¿Borrar la orden ' + o.numero + '?')) return;
+    accion((s) => ({ ...s, ordenes: (s.ordenes||[]).filter((x) => x.id !== o.id) }));
+    brindar('Orden eliminada.', 'ok');
+  };
+
+  const imprimirOrden = (o) => {
+    const items = o.items || [];
+    const filas = items.map((it) =>
+      '<tr><td>' + (it.descripcion||'') + (it.marca ? ' <small>(' + it.marca + ')</small>' : '') + '</td>' +
+      '<td style="text-align:center">' + (it.unidad||'Unidad') + '</td>' +
+      '<td style="text-align:right">' + E.num(it.cantidad).toLocaleString('es-NI') + '</td>' +
+      '<td style="text-align:right">' + E.num(it.precioUnitario).toLocaleString('es-NI',{minimumFractionDigits:2}) + '</td>' +
+      '<td style="text-align:right;font-weight:700">' + E.num(it.total).toLocaleString('es-NI',{minimumFractionDigits:2}) + '</td></tr>'
+    ).join('');
+    const retIR = o.retencionIR ? '<tr><td colspan="4" style="text-align:right">Retención IR 2%:</td><td style="text-align:right;color:#c00">-' + E.num(o.retencionIR).toLocaleString('es-NI',{minimumFractionDigits:2}) + '</td></tr>' : '';
+    const w = window.open('', '_blank', 'width=800,height=600');
+    w.document.write('<!DOCTYPE html><html><head><title>OC ' + o.numero + '</title>' +
+      '<style>body{font-family:Arial,sans-serif;padding:30px;color:#111;font-size:13px}' +
+      '.header{text-align:center;margin-bottom:24px;border-bottom:2px solid #333;padding-bottom:12px}' +
+      '.header h2{margin:0;font-size:16px}.header p{margin:2px 0;font-size:12px;color:#555}' +
+      'table{width:100%;border-collapse:collapse;margin-top:16px}' +
+      'th,td{border:1px solid #ccc;padding:6px 8px;font-size:12px}' +
+      'th{background:#f5f5f5;font-weight:700;text-align:left}' +
+      '.info{display:flex;flex-wrap:wrap;gap:12px 30px;font-size:12px;margin:12px 0}' +
+      '.info b{font-weight:700}.firmas{display:flex;justify-content:space-between;margin-top:60px}' +
+      '.firma{text-align:center;width:200px;border-top:1px solid #333;padding-top:6px;font-size:11px}' +
+      '@media print{body{padding:15px}}</style></head><body>' +
+      '<div class="header"><h2>Iglesia Oasis de Amor</h2>' +
+      '<p>RUC: J0810000163807</p>' +
+      '<p>Km 10 carretera nueva a León, contiguo a DIINSA, Ciudad Sandino, Managua</p>' +
+      '<p>Tel. 22691293</p></div>' +
+      '<h3 style="margin:0 0 10px">ORDEN DE COMPRA: ' + o.numero + '</h3>' +
+      '<div class="info">' +
+      '<div><b>Proveedor:</b> ' + (o.proveedor||'') + '</div>' +
+      '<div><b>Fecha:</b> ' + fFecha(o.fecha) + '</div>' +
+      (o.fechaEntrega ? '<div><b>Entrega:</b> ' + fFecha(o.fechaEntrega) + '</div>' : '') +
+      '<div><b>Estado:</b> ' + (ETQ_ORDEN[o.estado]||o.estado) + '</div></div>' +
+      '<table><thead><tr><th>Descripción</th><th style="text-align:center">Unidad</th><th style="text-align:right">Cant.</th><th style="text-align:right">P.U.</th><th style="text-align:right">Total</th></tr></thead>' +
+      '<tbody>' + filas + '</tbody>' +
+      '<tfoot><tr><td colspan="4" style="text-align:right;font-weight:700">Subtotal:</td><td style="text-align:right;font-weight:700">' + E.num(o.subtotal).toLocaleString('es-NI',{minimumFractionDigits:2}) + '</td></tr>' +
+      (E.num(o.impuesto) > 0 ? '<tr><td colspan="4" style="text-align:right">Impuesto (' + o.impuesto + '%):</td><td style="text-align:right">' + E.r2(E.num(o.subtotal)*E.num(o.impuesto)/100).toLocaleString('es-NI',{minimumFractionDigits:2}) + '</td></tr>' : '') +
+      retIR +
+      '<tr style="font-size:14px"><td colspan="4" style="text-align:right;font-weight:700">TOTAL:</td><td style="text-align:right;font-weight:700">' + E.num(o.total).toLocaleString('es-NI',{minimumFractionDigits:2}) + '</td></tr>' +
+      '</tfoot></table>' +
+      (o.notas ? '<p style="margin-top:16px;font-size:11px"><b>Notas:</b> ' + o.notas + '</p>' : '') +
+      '<div class="firmas"><div class="firma">Elaborado por</div><div class="firma">Autorizado por</div><div class="firma">Recibido por</div></div>' +
+      '</body></html>');
+    w.document.close();
+    setTimeout(function() { w.print(); }, 400);
+  };
+
+  const pasarAGasto = (o) => {
+    if (!o.categoriaId) return brindar('Asigna categoría a la orden primero.', 'err');
+    if (!confirm('¿Registrar ' + dinero(o.total) + ' como gasto?')) return;
+    const g = E.normalizarGasto({ proyectoId: estado.proyectoActivo, categoriaId: o.categoriaId, fecha: E.hoy(), descripcion: 'OC ' + o.numero + ': ' + o.proveedor, proveedor: o.proveedor, tipo: 'material', cantidad: 1, unidad: 'Global', precioUnitario: o.total, pagado: false, notas: 'Generado desde orden de compra ' + o.numero });
+    accion((s) => ({ ...s, gastos: s.gastos.concat([g]) }));
+    brindar('Gasto creado desde la orden.', 'ok');
+  };
+
+  return (
+    <div>
+      <div className="tarjeta">
+        <div className="tarjeta-cab">
+          <h3>Órdenes de compra</h3>
+          <button className="btn btn-p btn-sm" onClick={abrirNueva}><Icono n="mas" s={16} />Nueva orden</button>
+        </div>
+        <div className="filtros">
+          <select value={fEstado} onChange={(e) => setFEstado(e.target.value)}>
+            <option value="">Todos los estados</option>
+            {Object.keys(ETQ_ORDEN).map((k) => <option key={k} value={k}>{ETQ_ORDEN[k]}</option>)}
+          </select>
+        </div>
+        {ordenes.length === 0 ? (
+          <Vacio icono="orden" titulo="Sin órdenes" texto="Crea tu primera orden de compra." accion={<button className="btn btn-p" onClick={abrirNueva}><Icono n="mas" s={16} />Nueva orden</button>} />
+        ) : (
+          <div className="tabla-cont">
+            <table>
+              <thead><tr><th>N°</th><th>Proveedor</th><th>Fecha</th><th className="cen">Estado</th><th className="der">Total</th><th className="der">Acciones</th></tr></thead>
+              <tbody>
+                {ordenes.map((o) => (
+                  <tr key={o.id}>
+                    <td className="mono" style={{fontWeight:700,fontSize:13}}>{o.numero}</td>
+                    <td><div style={{fontWeight:600}}>{o.proveedor}</div><div className="mini">{(o.items||[]).length} ítem(s)</div></td>
+                    <td className="mono" style={{fontSize:13}}>{fFecha(o.fecha)}{o.fechaEntrega ? <span className="mini" style={{display:'block'}}>Entrega: {fFecha(o.fechaEntrega)}</span> : null}</td>
+                    <td className="cen"><Chip estado={CHIP_ORDEN[o.estado]} texto={ETQ_ORDEN[o.estado]} /></td>
+                    <td className="der mono" style={{fontWeight:700}}>{dinero(o.total)}</td>
+                    <td className="der" style={{whiteSpace:'nowrap'}}>
+                      {o.estado === 'borrador' ? <button className="btn btn-sm" style={{marginRight:4}} onClick={() => cambiarEstadoOrden(o,'aprobada')}>Aprobar</button> : null}
+                      {o.estado === 'aprobada' ? <button className="btn btn-sm" style={{marginRight:4}} onClick={() => cambiarEstadoOrden(o,'recibida')}>Recibir</button> : null}
+                      {o.estado === 'recibida' ? <button className="btn btn-sm" style={{marginRight:4}} onClick={() => pasarAGasto(o)}>A gasto</button> : null}
+                      <button className="btn-icono" title="Imprimir" onClick={() => imprimirOrden(o)}><Icono n="imprimir" s={17} /></button>
+                      <button className="btn-icono" onClick={() => {
+                        const items = (o.items||[]).map((it)=>({...it,marca:it.marca||'',cantidad:String(it.cantidad),unidad:it.unidad||'Unidad',precioUnitario:String(it.precioUnitario)}));
+                        while(items.length<2) items.push(itemVacio());
+                        setForm({...o,impuesto:String(o.impuesto||0),retencionIR:!!o.retencionIR,items,notas:o.notas||''});
+                      }}><Icono n="lapiz" s={17} /></button>
+                      {o.estado !== 'recibida' ? <button className="btn-icono" onClick={() => borrarOrden(o)}><Icono n="basura" s={17} /></button> : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+      {form ? (
+        <Modal ancho={700} titulo={form.id ? 'Editar orden' : 'Nueva orden de compra'} onCerrar={() => setForm(null)}
+          pie={<React.Fragment><button className="btn" onClick={() => setForm(null)}>Cancelar</button><button className="btn btn-p" onClick={guardarOrden}><Icono n="check" s={16} />Guardar</button></React.Fragment>}>
+          <div className="dos">
+            <Campo etq="Número"><input value={form.numero} className="mono" onChange={(e) => setForm({...form,numero:e.target.value})} /></Campo>
+            <Campo etq="Proveedor"><CampoProveedor valor={form.proveedor} onChange={(v) => setForm({...form,proveedor:v})} proveedores={estado.proveedores} accion={accion} brindar={brindar} /></Campo>
+          </div>
+          <div className="tres">
+            <Campo etq="Categoría"><select value={form.categoriaId} onChange={(e) => setForm({...form,categoriaId:e.target.value})}><option value="">Sin asignar</option>{cats.map((c)=><option key={c.id} value={c.id}>{c.nombre}</option>)}</select></Campo>
+            <Campo etq="Fecha"><input type="date" value={form.fecha} onChange={(e) => setForm({...form,fecha:e.target.value})} /></Campo>
+            <Campo etq="Entrega prevista"><input type="date" value={form.fechaEntrega||''} onChange={(e) => setForm({...form,fechaEntrega:e.target.value})} /></Campo>
+          </div>
+          <div style={{fontSize:11,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--texto-3)',fontWeight:700,marginBottom:10}}>Ítems</div>
+          {form.items.map((it,i) => (
+            <div key={it.id} style={{display:'flex',gap:8,alignItems:'flex-end',marginBottom:8,flexWrap:'wrap'}}>
+              <div style={{flex:2,minWidth:120}}><input value={it.descripcion} placeholder="Descripción" style={{background:'var(--fondo-2)',border:'1px solid var(--borde)',borderRadius:9,padding:'9px 10px',color:'var(--texto)',width:'100%',fontSize:14}} onChange={(e) => setForm({...form,items:form.items.map((x,j)=>j===i?{...x,descripcion:e.target.value}:x)})} /></div>
+              <div style={{width:85}}><input value={it.marca||''} placeholder="Marca" style={{background:'var(--fondo-2)',border:'1px solid var(--borde)',borderRadius:9,padding:'9px 10px',color:'var(--texto)',width:'100%',fontSize:14}} onChange={(e) => setForm({...form,items:form.items.map((x,j)=>j===i?{...x,marca:e.target.value}:x)})} /></div>
+              <div style={{width:70}}><input className="mono" value={it.cantidad} placeholder="Cant." style={{background:'var(--fondo-2)',border:'1px solid var(--borde)',borderRadius:9,padding:'9px 10px',color:'var(--texto)',width:'100%',fontSize:14}} onChange={(e) => setForm({...form,items:form.items.map((x,j)=>j===i?{...x,cantidad:e.target.value}:x)})} /></div>
+              <div style={{width:80}}><select value={it.unidad||'Unidad'} style={{background:'var(--fondo-2)',border:'1px solid var(--borde)',borderRadius:9,padding:'9px 10px',color:'var(--texto)',width:'100%',fontSize:13}} onChange={(e) => setForm({...form,items:form.items.map((x,j)=>j===i?{...x,unidad:e.target.value}:x)})}>{['Unidad','m²','m³','Libras','Bolsa','Caja','Global','Jornal','qq','ml','L'].map((u)=><option key={u}>{u}</option>)}</select></div>
+              <div style={{width:90}}><input className="mono" value={it.precioUnitario} placeholder="P.U." style={{background:'var(--fondo-2)',border:'1px solid var(--borde)',borderRadius:9,padding:'9px 10px',color:'var(--texto)',width:'100%',fontSize:14}} onChange={(e) => setForm({...form,items:form.items.map((x,j)=>j===i?{...x,precioUnitario:e.target.value}:x)})} /></div>
+              <div className="mono" style={{width:85,fontSize:13,textAlign:'right',fontWeight:600}}>{dinero(E.r2(E.num(it.cantidad)*E.num(it.precioUnitario)),true)}</div>
+              {form.items.length > 1 ? <button className="btn-icono" onClick={() => setForm({...form,items:form.items.filter((_,j)=>j!==i)})}><Icono n="equis" s={16} /></button> : null}
+            </div>
+          ))}
+          <button className="btn btn-sm" style={{marginBottom:14}} onClick={() => setForm({...form,items:form.items.concat([itemVacio()])})}><Icono n="mas" s={15} />Agregar ítem</button>
+          <label className="interruptor" style={{marginBottom:10}}>
+            <input type="checkbox" checked={!!form.retencionIR} onChange={(e) => setForm({...form,retencionIR:e.target.checked})} />
+            <span className="pista-sw" /><span>Aplicar retención IR 2%</span>
+          </label>
+          <div className="dos">
+            <Campo etq="Impuesto (%)"><input className="mono" inputMode="decimal" value={form.impuesto} onChange={(e) => setForm({...form,impuesto:e.target.value})} /></Campo>
+            <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',justifyContent:'center',gap:4}}>
+              {form.retencionIR ? <span className="mini mono" style={{color:'var(--rojo)'}}>IR 2%: -{dinero(E.r2(subForm() * 0.02))}</span> : null}
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <span style={{fontSize:12,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--texto-3)',fontWeight:700}}>Total</span>
+                <span className="mono" style={{fontSize:22,fontWeight:700,color:'var(--ambar)'}}>{dinero(totalForm())}</span>
+              </div>
+            </div>
+          </div>
+          <Campo etq="Notas"><textarea value={form.notas} onChange={(e) => setForm({...form,notas:e.target.value})} /></Campo>
+        </Modal>
+      ) : null}
+    </div>
+  );
+}
+
+/* ============================================================
+   VISTA: CONTRATOS
+   ============================================================ */
+function Contratos({ estado, dinero, accion, brindar }) {
+  const [form, setForm] = useState(null);
+  const contratos = (estado.contratos || []).filter((c) => c.proyectoId === estado.proyectoActivo)
+    .sort((a, b) => a.fechaInicio < b.fechaInicio ? 1 : -1);
+
+  const CHIP_CONT = { vigente: 'sano', completado: 'neutro', cancelado: 'excedido' };
+  const ETQ_CONT = { vigente: 'Vigente', completado: 'Completado', cancelado: 'Cancelado' };
+
+  const abrirNuevo = () => setForm({ id: null, proveedor: '', titulo: '', montoContrato: '', anticipo: '0', retencion: '0', fechaInicio: E.hoy(), fechaFin: '', estado: 'vigente', avance: 0, notas: '' });
+
+  const guardarContrato = () => {
+    if (!form.titulo.trim()) return brindar('El contrato necesita un título.', 'err');
+    if (E.num(form.montoContrato) <= 0) return brindar('El monto debe ser mayor a cero.', 'err');
+    const c = E.normalizarContrato({ id: form.id || E.uid('co'), proyectoId: estado.proyectoActivo, proveedor: form.proveedor.trim(), titulo: form.titulo.trim(), montoContrato: form.montoContrato, anticipo: form.anticipo, retencion: form.retencion, fechaInicio: form.fechaInicio, fechaFin: form.fechaFin, estado: form.estado, avance: form.avance, notas: form.notas, creado: form.creado });
+    accion((s) => ({ ...s, contratos: form.id ? (s.contratos||[]).map((x) => x.id === form.id ? c : x) : (s.contratos||[]).concat([c]) }));
+    brindar(form.id ? 'Contrato actualizado.' : 'Contrato creado.', 'ok');
+    setForm(null);
+  };
+
+  const borrarContrato = (c) => {
+    if (!confirm('¿Borrar el contrato "' + c.titulo + '"?')) return;
+    accion((s) => ({ ...s, contratos: (s.contratos||[]).filter((x) => x.id !== c.id) }));
+    brindar('Contrato eliminado.', 'ok');
+  };
+
+  return (
+    <div>
+      <div className="tarjeta-cab" style={{marginBottom:16}}>
+        <h3 style={{fontSize:18}}>Contratos</h3>
+        <button className="btn btn-p btn-sm" onClick={abrirNuevo}><Icono n="mas" s={16} />Nuevo contrato</button>
+      </div>
+      {contratos.length === 0 ? (
+        <div className="tarjeta"><Vacio icono="contrato" titulo="Sin contratos" texto="Registra contratos para dar seguimiento al avance y retenciones."
+          accion={<button className="btn btn-p" onClick={abrirNuevo}><Icono n="mas" s={16} />Nuevo contrato</button>} /></div>
+      ) : (
+        <div className="rejilla" style={{gridTemplateColumns:'repeat(auto-fill,minmax(340px,1fr))',gap:14}}>
+          {contratos.map((c) => {
+            const montoAnticipo = E.r2(E.num(c.montoContrato) * E.num(c.anticipo) / 100);
+            const montoRetencion = E.r2(E.num(c.montoContrato) * E.num(c.retencion) / 100);
+            const abonado = E.r2((estado.pagos||[]).filter((p) => p.contratoId === c.id).reduce((s,p) => s + E.num(p.monto), 0));
+            const saldoContrato = E.r2(E.num(c.montoContrato) - abonado);
+            return (
+              <div className="tarjeta" key={c.id}>
+                <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'flex-start'}}>
+                  <div style={{minWidth:0}}>
+                    <div style={{fontWeight:700,fontSize:16}}>{c.titulo}</div>
+                    <div className="mini" style={{marginTop:3}}>{c.proveedor || 'Sin proveedor'}</div>
+                  </div>
+                  <div style={{display:'flex',gap:4,alignItems:'center',flexShrink:0}}>
+                    <Chip estado={CHIP_CONT[c.estado]} texto={ETQ_CONT[c.estado]} />
+                    <button className="btn-icono" onClick={() => setForm({...c,montoContrato:String(c.montoContrato),anticipo:String(c.anticipo),retencion:String(c.retencion),notas:c.notas||''})}><Icono n="lapiz" s={17} /></button>
+                    <button className="btn-icono" onClick={() => borrarContrato(c)}><Icono n="basura" s={17} /></button>
+                  </div>
+                </div>
+                <div style={{margin:'14px 0 8px'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:6}}>
+                    <span className="tenue">Avance</span><span className="mono" style={{fontWeight:700}}>{c.avance}%</span>
+                  </div>
+                  <Barra pct={c.avance} estado={c.avance >= 100 ? 'sano' : c.avance >= 75 ? 'alerta' : 'sinPresupuesto'} />
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px 16px',fontSize:13,marginTop:12}}>
+                  <div><span className="tenue">Monto: </span><span className="mono" style={{fontWeight:700}}>{dinero(c.montoContrato, true)}</span></div>
+                  <div><span className="tenue">Anticipo: </span><span className="mono">{dinero(montoAnticipo, true)} ({c.anticipo}%)</span></div>
+                  <div><span className="tenue">Retención: </span><span className="mono">{dinero(montoRetencion, true)} ({c.retencion}%)</span></div>
+                  <div><span className="tenue">Periodo: </span><span className="mono">{fFecha(c.fechaInicio)} — {c.fechaFin ? fFecha(c.fechaFin) : '…'}</span></div>
+                  <div><span className="tenue">Abonado: </span><span className="mono" style={{fontWeight:700,color:'var(--verde)'}}>{dinero(abonado, true)}</span></div>
+                  <div><span className="tenue">Saldo: </span><span className="mono" style={{fontWeight:700,color: saldoContrato > 0 ? 'var(--rojo)' : 'var(--verde)'}}>{dinero(saldoContrato, true)}</span></div>
+                </div>
+                {c.notas ? <div className="mini tenue" style={{marginTop:10}}>{c.notas}</div> : null}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {form ? (
+        <Modal titulo={form.id ? 'Editar contrato' : 'Nuevo contrato'} onCerrar={() => setForm(null)}
+          pie={<React.Fragment><button className="btn" onClick={() => setForm(null)}>Cancelar</button><button className="btn btn-p" onClick={guardarContrato}><Icono n="check" s={16} />Guardar</button></React.Fragment>}>
+          <Campo etq="Título"><input value={form.titulo} autoFocus placeholder="Ej. Contrato de obra civil" onChange={(e) => setForm({...form,titulo:e.target.value})} /></Campo>
+          <div className="dos">
+            <Campo etq="Proveedor / Contratista"><CampoProveedor valor={form.proveedor} onChange={(v) => setForm({...form,proveedor:v})} proveedores={estado.proveedores} accion={accion} brindar={brindar} /></Campo>
+            <Campo etq="Monto del contrato"><input className="mono" inputMode="decimal" value={form.montoContrato} placeholder="0.00" onChange={(e) => setForm({...form,montoContrato:e.target.value})} /></Campo>
+          </div>
+          <div className="tres">
+            <Campo etq="Anticipo (%)"><input className="mono" inputMode="decimal" value={form.anticipo} onChange={(e) => setForm({...form,anticipo:e.target.value})} /></Campo>
+            <Campo etq="Retención (%)"><input className="mono" inputMode="decimal" value={form.retencion} onChange={(e) => setForm({...form,retencion:e.target.value})} /></Campo>
+            <Campo etq="Estado"><select value={form.estado} onChange={(e) => setForm({...form,estado:e.target.value})}>{Object.keys(ETQ_CONT).map((k) => <option key={k} value={k}>{ETQ_CONT[k]}</option>)}</select></Campo>
+          </div>
+          <div className="dos">
+            <Campo etq="Fecha inicio"><input type="date" value={form.fechaInicio} onChange={(e) => setForm({...form,fechaInicio:e.target.value})} /></Campo>
+            <Campo etq="Fecha fin"><input type="date" value={form.fechaFin||''} onChange={(e) => setForm({...form,fechaFin:e.target.value})} /></Campo>
+          </div>
+          <Campo etq={'Avance (' + form.avance + '%)'}>
+            <input type="range" min="0" max="100" step="5" value={form.avance} onChange={(e) => setForm({...form,avance:Number(e.target.value)})} />
+          </Campo>
+          <Campo etq="Notas"><textarea value={form.notas} onChange={(e) => setForm({...form,notas:e.target.value})} /></Campo>
+        </Modal>
+      ) : null}
+    </div>
+  );
+}
+
+/* ============================================================
+   VISTA: PAGOS (abonos, adelantos, anticipos)
+   ============================================================ */
+function formPagoVacio() {
+  return { id: null, tipo: 'abono', metodo: 'efectivo', referencia: '', monto: '', fecha: E.hoy(), contratoId: '', proveedorId: '', trabajador: '', descripcion: '', notas: '', _esNuevo: true };
+}
+
+function Pagos({ estado, dinero, accion, brindar }) {
+  const [form, setForm] = useState(null);
+  const [fTipo, setFTipo] = useState('');
+  const [fProv, setFProv] = useState('');
+  const [fTrab, setFTrab] = useState('');
+  const [fCont, setFCont] = useState('');
+
+  const contratosProyecto = (estado.contratos || []).filter((c) => c.proyectoId === estado.proyectoActivo);
+  const contMap = {};
+  contratosProyecto.forEach((c) => contMap[c.id] = c);
+
+  const pagos = (estado.pagos || []).filter((p) => p.proyectoId === estado.proyectoActivo
+    && (!fTipo || p.tipo === fTipo)
+    && (!fProv || p.proveedorId === fProv)
+    && (!fTrab || p.trabajador === fTrab)
+    && (!fCont || p.contratoId === fCont)
+  ).sort((a, b) => a.fecha < b.fecha ? 1 : -1);
+
+  const total = E.r2(pagos.reduce((s, p) => s + E.num(p.monto), 0));
+  const trabajadores = Array.from(new Set((estado.pagos||[]).filter((p) => p.proyectoId === estado.proyectoActivo && p.trabajador).map((p) => p.trabajador)));
+  const provMap = {};
+  (estado.proveedores||[]).forEach((p) => provMap[p.id] = p.nombre);
+
+  const guardarPago = () => {
+    if (E.num(form.monto) <= 0) return brindar('El monto debe ser mayor a cero.', 'err');
+    if (!form.descripcion.trim()) return brindar('Agrega una descripción.', 'err');
+    const p = E.normalizarPago({ id: form.id || undefined, proyectoId: estado.proyectoActivo, tipo: form.tipo, metodo: form.metodo, referencia: form.referencia.trim(), monto: form.monto, fecha: form.fecha, contratoId: form.contratoId, proveedorId: form.proveedorId, trabajador: form.trabajador.trim(), descripcion: form.descripcion.trim(), notas: form.notas.trim(), creado: form.creado });
+    accion((s) => ({ ...s, pagos: form._esNuevo ? (s.pagos||[]).concat([p]) : (s.pagos||[]).map((x) => x.id === form.id ? p : x) }));
+    brindar(form._esNuevo ? 'Pago registrado.' : 'Pago actualizado.', 'ok');
+    setForm(null);
+  };
+
+  const borrarPago = (p) => {
+    if (!confirm('¿Borrar este pago?')) return;
+    accion((s) => ({ ...s, pagos: (s.pagos||[]).filter((x) => x.id !== p.id) }));
+    brindar('Pago eliminado.', 'ok');
+  };
+
+  const CHIP_TIPO = { abono: 'sano', adelanto_material: 'alerta', adelanto_mano_obra: 'alerta', anticipo: 'sinPresupuesto', liquidacion: 'neutro' };
+  const etqTipo = (t) => (E.TIPOS_PAGO.find((x) => x.id === t) || { label: t }).label;
+  const etqMetodo = (m) => (E.METODOS_PAGO.find((x) => x.id === m) || { label: m }).label;
+
+  return (
+    <div>
+      <div className="tarjeta">
+        <div className="tarjeta-cab">
+          <h3>Pagos y adelantos</h3>
+          <button className="btn btn-p btn-sm" onClick={() => setForm(formPagoVacio())}><Icono n="mas" s={16} />Registrar pago</button>
+        </div>
+        <div className="filtros">
+          <select value={fTipo} onChange={(e) => setFTipo(e.target.value)}><option value="">Todos los tipos</option>{E.TIPOS_PAGO.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}</select>
+          <select value={fProv} onChange={(e) => setFProv(e.target.value)}><option value="">Todos los proveedores</option>{(estado.proveedores||[]).map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}</select>
+          {contratosProyecto.length > 0 ? <select value={fCont} onChange={(e) => setFCont(e.target.value)}><option value="">Todos los contratos</option>{contratosProyecto.map((c) => <option key={c.id} value={c.id}>{c.titulo}</option>)}</select> : null}
+          {trabajadores.length > 0 ? <select value={fTrab} onChange={(e) => setFTrab(e.target.value)}><option value="">Todos los trabajadores</option>{trabajadores.map((t) => <option key={t} value={t}>{t}</option>)}</select> : null}
+        </div>
+        {pagos.length === 0 ? (
+          <Vacio icono="pago" titulo="Sin pagos registrados" texto="Registra abonos, adelantos y anticipos."
+            accion={<button className="btn btn-p" onClick={() => setForm(formPagoVacio())}><Icono n="mas" s={16} />Registrar</button>} />
+        ) : (
+          <React.Fragment>
+            <div className="tabla-cont">
+              <table>
+                <thead><tr><th style={{width:78}}>Fecha</th><th>Descripción</th><th>Contrato</th><th className="cen">Tipo</th><th>Método</th><th>Beneficiario</th><th className="der">Monto</th><th className="der"></th></tr></thead>
+                <tbody>
+                  {pagos.map((p) => (
+                    <tr key={p.id}>
+                      <td className="mono" style={{fontSize:13}}>{fFecha(p.fecha)}</td>
+                      <td>
+                        <div style={{fontWeight:600}}>{p.descripcion}</div>
+                        {p.referencia ? <div className="mini">Ref: {p.referencia}</div> : null}
+                      </td>
+                      <td style={{fontSize:13}}>{contMap[p.contratoId] ? contMap[p.contratoId].titulo : '—'}</td>
+                      <td className="cen"><Chip estado={CHIP_TIPO[p.tipo]||'neutro'} texto={etqTipo(p.tipo)} /></td>
+                      <td style={{fontSize:13}}>{etqMetodo(p.metodo)}</td>
+                      <td style={{fontSize:13}}>{p.trabajador || provMap[p.proveedorId] || '—'}</td>
+                      <td className="der mono" style={{fontWeight:700}}>{dinero(p.monto)}</td>
+                      <td className="der" style={{whiteSpace:'nowrap'}}>
+                        <button className="btn-icono" onClick={() => setForm({...p,monto:String(p.monto),contratoId:p.contratoId||'',referencia:p.referencia||'',trabajador:p.trabajador||'',descripcion:p.descripcion||'',notas:p.notas||'',_esNuevo:false})}><Icono n="lapiz" s={17} /></button>
+                        <button className="btn-icono" onClick={() => borrarPago(p)}><Icono n="basura" s={17} /></button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, paddingTop: 14, borderTop: '2px solid var(--borde-fuerte)' }}>
+              <span className="mini">{pagos.length} pago(s)</span>
+              <span className="mono" style={{ fontSize: 18, fontWeight: 700 }}>{dinero(total)}</span>
+            </div>
+          </React.Fragment>
+        )}
+      </div>
+      {form ? (
+        <Modal titulo={form._esNuevo ? 'Registrar pago' : 'Editar pago'} onCerrar={() => setForm(null)}
+          pie={<React.Fragment><button className="btn" onClick={() => setForm(null)}>Cancelar</button><button className="btn btn-p" onClick={guardarPago}><Icono n="check" s={16} />Guardar</button></React.Fragment>}>
+          <Campo etq="Descripción"><input value={form.descripcion} autoFocus placeholder="Ej. Abono materiales semana 3" onChange={(e) => setForm({...form,descripcion:e.target.value})} /></Campo>
+          <div className="dos">
+            <Campo etq="Tipo"><select value={form.tipo} onChange={(e) => setForm({...form,tipo:e.target.value})}>{E.TIPOS_PAGO.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}</select></Campo>
+            <Campo etq="Método"><select value={form.metodo} onChange={(e) => setForm({...form,metodo:e.target.value})}>{E.METODOS_PAGO.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select></Campo>
+          </div>
+          <div className="dos">
+            <Campo etq="Monto"><input className="mono" inputMode="decimal" value={form.monto} placeholder="0.00" onChange={(e) => setForm({...form,monto:e.target.value})} /></Campo>
+            <Campo etq="Fecha"><input type="date" value={form.fecha} onChange={(e) => setForm({...form,fecha:e.target.value})} /></Campo>
+          </div>
+          <Campo etq="Referencia (N° cheque, transf., etc.)"><input value={form.referencia} placeholder="Opcional" onChange={(e) => setForm({...form,referencia:e.target.value})} /></Campo>
+          <Campo etq="Contrato (abono a)"><select value={form.contratoId} onChange={(e) => { const cid = e.target.value; const ct = contMap[cid]; setForm({...form, contratoId: cid, proveedorId: ct ? ((estado.proveedores||[]).find((p) => p.nombre === ct.proveedor)||{}).id || form.proveedorId : form.proveedorId}); }}><option value="">Ninguno (pago independiente)</option>{contratosProyecto.map((c) => <option key={c.id} value={c.id}>{c.titulo} — {dinero(c.montoContrato, true)}</option>)}</select></Campo>
+          {form.contratoId && contMap[form.contratoId] ? (() => { const ct = contMap[form.contratoId]; const abonado = E.r2((estado.pagos||[]).filter((p) => p.contratoId === form.contratoId && p.id !== form.id).reduce((s,p) => s + E.num(p.monto), 0)); const saldo = E.r2(E.num(ct.montoContrato) - abonado); return <div style={{background:'var(--fondo-elev)',borderRadius:8,padding:'10px 14px',marginBottom:14,fontSize:13}}><div className="dos"><div><span className="tenue">Monto contrato: </span><span className="mono" style={{fontWeight:700}}>{dinero(ct.montoContrato, true)}</span></div><div><span className="tenue">Ya abonado: </span><span className="mono">{dinero(abonado, true)}</span></div></div><div style={{marginTop:6}}><span className="tenue">Saldo pendiente: </span><span className="mono" style={{fontWeight:700,color: saldo > 0 ? 'var(--rojo)' : 'var(--verde)'}}>{dinero(saldo, true)}</span></div></div>; })() : null}
+          <div className="dos">
+            <Campo etq="Proveedor"><select value={form.proveedorId} onChange={(e) => setForm({...form,proveedorId:e.target.value})}><option value="">Ninguno</option>{(estado.proveedores||[]).map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}</select></Campo>
+            <Campo etq="Trabajador"><input value={form.trabajador} placeholder="Nombre del trabajador (opcional)" onChange={(e) => setForm({...form,trabajador:e.target.value})} /></Campo>
+          </div>
+          <Campo etq="Notas"><textarea value={form.notas} onChange={(e) => setForm({...form,notas:e.target.value})} /></Campo>
+        </Modal>
+      ) : null}
+    </div>
+  );
+}
+
+/* ============================================================
+   VISTA: CALENDARIO DE PAGOS
+   ============================================================ */
+function Calendario({ estado, dinero }) {
+  const [mesActual, setMesActual] = useState(() => { const h = new Date(); return h.getFullYear() + '-' + String(h.getMonth()+1).padStart(2,'0'); });
+  const [diaSel, setDiaSel] = useState(null);
+
+  const [anio, mes] = mesActual.split('-').map(Number);
+  const primerDia = new Date(anio, mes - 1, 1);
+  const ultimoDia = new Date(anio, mes, 0);
+  const diasEnMes = ultimoDia.getDate();
+  const inicioSemana = primerDia.getDay(); // 0=dom
+  const hoyStr = E.hoy();
+  const DIAS_SEM = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const MESES_LARGO = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  const eventos = useMemo(() => {
+    const evs = [];
+    (estado.gastos || []).filter((g) => g.proyectoId === estado.proyectoActivo && !g.pagado && g.fechaVencimiento)
+      .forEach((g) => { if (E.mesDe(g.fechaVencimiento) === mesActual) evs.push({ tipo: 'gasto', fecha: g.fechaVencimiento, desc: g.descripcion || 'Gasto', monto: g.monto, proveedor: g.proveedor }); });
+    (estado.ordenes || []).filter((o) => o.proyectoId === estado.proyectoActivo && o.estado === 'aprobada' && o.fechaEntrega)
+      .forEach((o) => { if (E.mesDe(o.fechaEntrega) === mesActual) evs.push({ tipo: 'orden', fecha: o.fechaEntrega, desc: 'OC ' + o.numero, monto: o.total, proveedor: o.proveedor }); });
+    return evs;
+  }, [estado, mesActual]);
+
+  const eventosPorDia = {};
+  eventos.forEach((ev) => { const d = parseInt(ev.fecha.split('-')[2], 10); if (!eventosPorDia[d]) eventosPorDia[d] = []; eventosPorDia[d].push(ev); });
+
+  const mesAnterior = () => { const d = new Date(anio, mes - 2, 1); setMesActual(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0')); setDiaSel(null); };
+  const mesSiguiente = () => { const d = new Date(anio, mes, 1); setMesActual(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0')); setDiaSel(null); };
+
+  const eventosVista = diaSel ? (eventosPorDia[diaSel] || []) : eventos.sort((a,b) => a.fecha < b.fecha ? -1 : 1);
+
+  return (
+    <div className="rejilla" style={{gap:16}}>
+      <div className="tarjeta">
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
+          <button className="btn btn-sm" onClick={mesAnterior}><Icono n="derecha" s={16} c="var(--texto-2)" /></button>
+          <h3 style={{fontSize:18}}>{MESES_LARGO[mes-1]} {anio}</h3>
+          <button className="btn btn-sm" onClick={mesSiguiente}><Icono n="derecha" s={16} /></button>
+        </div>
+        <div className="cal-grid" style={{marginBottom:4}}>
+          {DIAS_SEM.map((d) => <div key={d} style={{textAlign:'center',fontSize:11,fontWeight:700,color:'var(--texto-3)',padding:'6px 0',textTransform:'uppercase',letterSpacing:'.08em'}}>{d}</div>)}
+        </div>
+        <div className="cal-grid">
+          {Array.from({length:inicioSemana}).map((_,i) => <div key={'v'+i} className="cal-dia otro"></div>)}
+          {Array.from({length:diasEnMes}).map((_,i) => {
+            const dia = i + 1;
+            const fechaDia = mesActual + '-' + String(dia).padStart(2,'0');
+            const esHoy = fechaDia === hoyStr;
+            const esSel = dia === diaSel;
+            const tiene = eventosPorDia[dia];
+            const diasH = E.diasHasta(fechaDia);
+            return (
+              <div key={dia} className={'cal-dia' + (esHoy ? ' hoy' : '') + (esSel ? ' sel' : '')} onClick={() => setDiaSel(esSel ? null : dia)}>
+                <span>{dia}</span>
+                {tiene ? <div className="cal-dot" style={{background: diasH < 0 ? 'var(--rojo)' : diasH === 0 ? 'var(--ambar)' : 'var(--texto-3)'}} /> : null}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="tarjeta">
+        <div className="tarjeta-cab">
+          <h3>{diaSel ? 'Pagos del ' + diaSel + '/' + String(mes).padStart(2,'0') : 'Pagos del mes'}</h3>
+          {diaSel ? <button className="btn btn-sm" onClick={() => setDiaSel(null)}>Ver todo el mes</button> : null}
+        </div>
+        {eventosVista.length === 0 ? (
+          <Vacio icono="calendario" titulo={diaSel ? 'Sin pagos este día' : 'Sin pagos pendientes este mes'} texto="Los pagos aparecen cuando hay gastos o órdenes con fecha de vencimiento." />
+        ) : eventosVista.map((ev, i) => (
+          <div key={i} style={{display:'flex',justifyContent:'space-between',gap:12,padding:'11px 0',borderBottom:'1px solid var(--borde)',alignItems:'center'}}>
+            <div style={{display:'flex',gap:10,alignItems:'center',minWidth:0,flex:1}}>
+              <div className="cat-icono" style={{background:ev.tipo==='orden'?'rgba(91,168,242,.15)':undefined,color:ev.tipo==='orden'?'var(--azul)':undefined}}>
+                <Icono n={ev.tipo === 'orden' ? 'orden' : 'gastos'} s={17} />
+              </div>
+              <div style={{minWidth:0}}>
+                <div style={{fontWeight:600,fontSize:14}}>{ev.desc}</div>
+                <div className="mini">{ev.proveedor || '—'} · {fFecha(ev.fecha)}</div>
+              </div>
+            </div>
+            <div className="mono" style={{fontWeight:700,fontSize:14,flexShrink:0}}>{dinero(ev.monto, true)}</div>
+          </div>
+        ))}
+        {eventosVista.length > 0 ? (
+          <div style={{display:'flex',justifyContent:'flex-end',marginTop:12,paddingTop:12,borderTop:'2px solid var(--borde-fuerte)'}}>
+            <span className="mono" style={{fontSize:16,fontWeight:700}}>{dinero(eventosVista.reduce((s,ev)=>s+E.num(ev.monto),0))}</span>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   VISTA: PROVEEDORES
+   ============================================================ */
+function Proveedores({ estado, accion, brindar, dinero }) {
+  const [form, setForm] = useState(null);
+  const [buscar, setBuscar] = useState('');
+  const [historial, setHistorial] = useState(null);
+  const provs = (estado.proveedores || [])
+    .filter((p) => !buscar.trim() || p.nombre.toLowerCase().includes(buscar.toLowerCase()) || (p.telefono||'').includes(buscar))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+
+  const vacio = () => ({ id: null, nombre: '', contacto: '', telefono: '', correo: '', direccion: '', notas: '', calificacion: 3, condicionesPago: '', tiempoEntregaPromedio: '' });
+
+  const guardar = () => {
+    if (!form.nombre.trim()) return brindar('El proveedor necesita nombre.', 'err');
+    const dupl = (estado.proveedores || []).some((p) => p.id !== form.id && p.nombre.trim().toLowerCase() === form.nombre.trim().toLowerCase());
+    if (dupl) return brindar('Ya existe.', 'err');
+    if (form.id) {
+      accion((s) => ({ ...s, proveedores: (s.proveedores||[]).map((p) => p.id === form.id ? { ...p, ...form, nombre: form.nombre.trim() } : p) }));
+    } else {
+      accion((s) => ({ ...s, proveedores: (s.proveedores||[]).concat([{ ...form, id: E.uid('pv'), nombre: form.nombre.trim(), creado: new Date().toISOString() }]) }));
+    }
+    brindar(form.id ? 'Actualizado.' : 'Creado.', 'ok');
+    setForm(null);
+  };
+
+  const borrar = (p) => {
+    if (!confirm('¿Borrar "' + p.nombre + '"?')) return;
+    accion((s) => ({ ...s, proveedores: (s.proveedores||[]).filter((x) => x.id !== p.id) }));
+    brindar('Eliminado.', 'ok');
+  };
+
+  const verHistorial = (p) => {
+    const h = E.historialProveedor(p.nombre, estado.gastos, estado.licitaciones, estado.ordenes);
+    setHistorial({ ...h, nombre: p.nombre });
+  };
+
+  return (
+    <div>
+      {historial ? (
+        <Modal titulo={'Historial: ' + historial.nombre} onCerrar={() => setHistorial(null)}>
+          <div className="rejilla kpis" style={{gridTemplateColumns:'1fr 1fr 1fr',marginBottom:16}}>
+            <div style={{background:'var(--panel-2)',borderRadius:10,padding:'10px 12px',textAlign:'center'}}><div className="mini">Total gastado</div><div className="mono" style={{fontWeight:700,fontSize:16,marginTop:4}}>{dinero(historial.totalGastado, true)}</div></div>
+            <div style={{background:'var(--panel-2)',borderRadius:10,padding:'10px 12px',textAlign:'center'}}><div className="mini">Compras</div><div className="mono" style={{fontWeight:700,fontSize:16,marginTop:4}}>{historial.cantidadGastos}</div></div>
+            <div style={{background:'var(--panel-2)',borderRadius:10,padding:'10px 12px',textAlign:'center'}}><div className="mini">Promedio</div><div className="mono" style={{fontWeight:700,fontSize:16,marginTop:4}}>{dinero(historial.promedioGasto, true)}</div></div>
+          </div>
+          {historial.gastos.length > 0 ? (
+            <div className="tabla-cont">
+              <table style={{minWidth:0}}>
+                <thead><tr><th>Fecha</th><th>Descripción</th><th className="der">Monto</th></tr></thead>
+                <tbody>
+                  {historial.gastos.slice(0, 15).map((g) => (
+                    <tr key={g.id}><td className="mono" style={{fontSize:13}}>{fFecha(g.fecha)}</td><td>{g.descripcion}</td><td className="der mono" style={{fontWeight:700}}>{dinero(g.monto)}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : <p className="mini" style={{textAlign:'center'}}>Sin compras registradas.</p>}
+        </Modal>
+      ) : null}
+
+      <div className="tarjeta">
+        <div className="tarjeta-cab">
+          <h3>Proveedores</h3>
+          <button className="btn btn-p btn-sm" onClick={() => setForm(vacio())}><Icono n="mas" s={16} />Nuevo proveedor</button>
+        </div>
+        <div className="filtros"><input placeholder="Buscar nombre, teléfono…" value={buscar} onChange={(e) => setBuscar(e.target.value)} style={{flex:1}} /></div>
+        {provs.length === 0 ? (
+          <Vacio icono="mano_obra" titulo="Sin proveedores" texto="Agrega tus proveedores habituales." accion={<button className="btn btn-p" onClick={() => setForm(vacio())}><Icono n="mas" s={16} />Nuevo</button>} />
+        ) : (
+          <div className="rejilla" style={{gridTemplateColumns:'repeat(auto-fill,minmax(290px,1fr))',gap:12}}>
+            {provs.map((p) => (
+              <div key={p.id} className="tarjeta" style={{padding:'14px 16px'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+                  <div><div style={{fontWeight:700,fontSize:15}}>{p.nombre}</div><Estrellas valor={p.calificacion || 0} tam={14} /></div>
+                  <div style={{display:'flex',gap:2,flexShrink:0}}>
+                    <button className="btn-icono" title="Historial" onClick={() => verHistorial(p)}><Icono n="reportes" s={17} /></button>
+                    <button className="btn-icono" onClick={() => setForm({...p,calificacion:p.calificacion||3,condicionesPago:p.condicionesPago||'',tiempoEntregaPromedio:p.tiempoEntregaPromedio||''})}><Icono n="lapiz" s={17} /></button>
+                    <button className="btn-icono" onClick={() => borrar(p)}><Icono n="basura" s={17} /></button>
+                  </div>
+                </div>
+                {p.contacto ? <div className="mini" style={{marginTop:6}}><Icono n="mano_obra" s={13} /> {p.contacto}</div> : null}
+                {p.telefono ? <div className="mini" style={{marginTop:4}}><Icono n="reloj" s={13} /> {p.telefono}</div> : null}
+                {p.correo ? <div className="mini" style={{marginTop:4}}><Icono n="info" s={13} /> {p.correo}</div> : null}
+                {p.direccion ? <div className="mini" style={{marginTop:4}}><Icono n="ubicacion" s={13} /> {p.direccion}</div> : null}
+                {p.condicionesPago ? <div className="mini tenue" style={{marginTop:6}}>Pago: {p.condicionesPago}</div> : null}
+                {p.tiempoEntregaPromedio ? <div className="mini tenue">Entrega: {p.tiempoEntregaPromedio} días</div> : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {form ? (
+        <Modal titulo={form.id ? 'Editar proveedor' : 'Nuevo proveedor'} onCerrar={() => setForm(null)}
+          pie={<React.Fragment><button className="btn" onClick={() => setForm(null)}>Cancelar</button><button className="btn btn-p" onClick={guardar}><Icono n="check" s={16} />Guardar</button></React.Fragment>}>
+          <Campo etq="Nombre"><input value={form.nombre} autoFocus placeholder="Ej. Ferretería Jenny" onChange={(e) => setForm({...form,nombre:e.target.value})} /></Campo>
+          <Campo etq="Calificación"><Estrellas valor={form.calificacion} onChange={(n) => setForm({...form,calificacion:n})} /></Campo>
+          <Campo etq="Nombre del contacto"><input value={form.contacto||''} onChange={(e) => setForm({...form,contacto:e.target.value})} /></Campo>
+          <div className="dos">
+            <Campo etq="Teléfono"><input value={form.telefono||''} onChange={(e) => setForm({...form,telefono:e.target.value})} /></Campo>
+            <Campo etq="Correo"><input type="email" value={form.correo||''} onChange={(e) => setForm({...form,correo:e.target.value})} /></Campo>
+          </div>
+          <Campo etq="Dirección"><input value={form.direccion||''} onChange={(e) => setForm({...form,direccion:e.target.value})} /></Campo>
+          <div className="dos">
+            <Campo etq="Condiciones de pago"><input value={form.condicionesPago||''} placeholder="Ej. 30 días crédito" onChange={(e) => setForm({...form,condicionesPago:e.target.value})} /></Campo>
+            <Campo etq="Tiempo entrega prom. (días)"><input className="mono" inputMode="numeric" value={form.tiempoEntregaPromedio||''} onChange={(e) => setForm({...form,tiempoEntregaPromedio:e.target.value})} /></Campo>
+          </div>
+          <Campo etq="Notas"><textarea value={form.notas||''} onChange={(e) => setForm({...form,notas:e.target.value})} /></Campo>
+        </Modal>
+      ) : null}
+    </div>
+  );
+}
+
+/* ============================================================
+   VISTA: REPORTES
+   ============================================================ */
+function Reportes({ estado, v, dinero, brindar }) {
+  const mensual = useMemo(() => E.reporteMensual(estado.proyectoActivo, estado.categorias, estado.gastos), [estado]);
+  const fases = useMemo(() => E.reportePorFase(estado.proyectoActivo, estado.categorias, estado.gastos), [estado]);
+  const maxMes = Math.max.apply(null, [1].concat(mensual.map((m) => m.total)));
+  const ahorros = v.detalle.filter((d) => d.ahorro > 0 && d.presupuesto > 0).sort((a, b) => b.ahorro - a.ahorro);
+  const excesos = v.detalle.filter((d) => d.sobrecosto > 0).sort((a, b) => b.sobrecosto - a.sobrecosto);
+  const porTipo = E.gastosPorTipo(estado.proyectoActivo, estado.gastos);
+  const topProvs = E.topProveedoresPorGasto(estado.proyectoActivo, estado.gastos, 10);
+  const flujo = E.flujoMensual(estado.proyectoActivo, estado.gastos, estado.ordenes);
+  const maxTipo = Math.max.apply(null, [1].concat(porTipo.map((t) => t.monto)));
+
+  const exportarCSV = () => {
+    const mapaCat = {}; estado.categorias.forEach((c) => (mapaCat[c.id] = c));
+    const filas = [['Fecha','Descripcion','Categoria','Tipo','Proveedor','Cantidad','Unidad','P.U.','Monto','Pagado']];
+    estado.gastos.filter((g) => g.proyectoId === estado.proyectoActivo).sort((a,b)=>(a.fecha>b.fecha?1:-1)).forEach((g) => {
+      const c = mapaCat[g.categoriaId]||{};
+      filas.push([g.fecha,g.descripcion||'',c.nombre||'',g.tipo||'',g.proveedor||'',g.cantidad,g.unidad||'',g.precioUnitario,g.monto,g.pagado?'Si':'No']);
+    });
+    const csv = '﻿' + filas.map((f)=>f.map((x)=>'"'+String(x).replace(/"/g,'""')+'"').join(',')).join('\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})); a.download = 'gastos-'+E.hoy()+'.csv'; a.click();
+    brindar('CSV descargado.', 'ok');
+  };
+
+  return (
+    <div className="rejilla" style={{gap:16}}>
+      <div className="tarjeta">
+        <div className="tarjeta-cab">
+          <h3>Gasto mensual</h3>
+          <button className="btn btn-sm" onClick={exportarCSV}><Icono n="bajar" s={15} />Exportar CSV</button>
+        </div>
+        {mensual.length === 0 ? <Vacio icono="reportes" titulo="Sin datos" texto="Registra gastos para ver reportes." /> : (
+          <React.Fragment>
+            <div style={{display:'flex',alignItems:'flex-end',gap:10,height:175,padding:'10px 0 0',overflowX:'auto'}}>
+              {mensual.map((m) => (
+                <div key={m.mes} style={{flex:'1 0 46px',display:'flex',flexDirection:'column',alignItems:'center',gap:7,height:'100%',justifyContent:'flex-end'}}>
+                  <div className="mono" style={{fontSize:10.5,color:'var(--texto-2)',whiteSpace:'nowrap'}}>{dinero(m.total,true)}</div>
+                  <div style={{width:'100%',maxWidth:60,height:Math.max(4,(m.total/maxMes)*118),background:'linear-gradient(180deg,var(--ambar-claro),var(--ambar-oscuro))',borderRadius:'7px 7px 3px 3px'}} />
+                  <div style={{fontSize:10.5,color:'var(--texto-3)',whiteSpace:'nowrap',fontWeight:600}}>{m.etiqueta}</div>
+                </div>
+              ))}
+            </div>
+            <div className="sep" />
+            <div className="tabla-cont">
+              <table>
+                <thead><tr><th>Mes</th><th className="der">Total</th><th className="der">Variación</th><th>Cat. dominante</th><th className="cen">Mov.</th></tr></thead>
+                <tbody>
+                  {mensual.slice().reverse().map((m) => (
+                    <tr key={m.mes}>
+                      <td style={{fontWeight:600}}>{m.etiqueta}</td>
+                      <td className="der mono" style={{fontWeight:700}}>{dinero(m.total)}</td>
+                      <td className={'der mono '+(m.variacion>0?'neg':m.variacion<0?'pos':'tenue')}>
+                        {m.variacion===0?'—':<span style={{display:'inline-flex',alignItems:'center',gap:5}}><Icono n={m.variacion>0?'arribaT':'abajoT'} s={14} />{dinero(m.variacion,true)}</span>}
+                      </td>
+                      <td>{m.topCategoria?m.topCategoria.nombre:'—'}</td>
+                      <td className="cen mono">{m.movimientos}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </React.Fragment>
+        )}
+      </div>
+
+      <div className="rejilla" style={{gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))'}}>
+        <div className="tarjeta">
+          <div className="tarjeta-cab"><h3>Gasto por tipo</h3></div>
+          {porTipo.map((t) => (
+            <div key={t.tipo} style={{padding:'8px 0',borderBottom:'1px solid var(--borde)'}}>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:5}}>
+                <span style={{fontWeight:600}}>{t.label}</span>
+                <span className="mono">{dinero(t.monto, true)} ({t.pct}%)</span>
+              </div>
+              <div className="barrita"><i style={{width:(t.monto/maxTipo*100)+'%'}} /></div>
+            </div>
+          ))}
+        </div>
+
+        <div className="tarjeta">
+          <div className="tarjeta-cab"><h3>Top proveedores</h3></div>
+          {topProvs.length === 0 ? <p className="mini">Sin datos.</p> :
+            topProvs.map((p,i) => (
+              <div key={i} style={{display:'flex',justifyContent:'space-between',gap:10,padding:'8px 0',borderBottom:'1px solid var(--borde)'}}>
+                <span style={{fontSize:14,display:'flex',alignItems:'center',gap:8}}><span className="mono tenue" style={{width:22}}>{i+1}.</span>{p.proveedor}</span>
+                <span className="mono" style={{fontWeight:600,flexShrink:0}}>{dinero(p.total, true)}</span>
+              </div>
+            ))}
+        </div>
+      </div>
+
+      <div className="tarjeta">
+        <div className="tarjeta-cab"><h3>Avance por fase</h3></div>
+        {fases.length === 0 ? <Vacio icono="edificio" titulo="Sin fases" texto="Asigna fases a tus categorías." /> :
+          fases.map((f) => (
+            <div className="fila-cat" key={f.fase}>
+              <div className="fila-cat-top"><div className="fila-cat-nom">{f.fase}</div><Chip estado={f.estado.id} texto={f.ejecucion+'%'} /></div>
+              <Barra pct={f.ejecucion} estado={f.estado.id} />
+              <div className="fila-cat-cifras">
+                <span className="mono">{dinero(f.gastado, true)} <span className="tenue">de {dinero(f.presupuesto, true)}</span></span>
+                <span className={'mono '+(f.saldo>=0?'pos':'neg')}>{f.saldo>=0?'Ahorro ':'Sobrecosto '}{dinero(Math.abs(f.saldo),true)}</span>
+              </div>
+            </div>
+          ))}
+      </div>
+
+      {flujo.length > 0 ? (
+        <div className="tarjeta">
+          <div className="tarjeta-cab"><h3>Flujo de caja mensual</h3></div>
+          <div className="tabla-cont">
+            <table>
+              <thead><tr><th>Mes</th><th className="der">Gastos pagados</th><th className="der">Pendientes</th><th className="der">Total mes</th></tr></thead>
+              <tbody>
+                {flujo.map((f) => (
+                  <tr key={f.mes}>
+                    <td style={{fontWeight:600}}>{f.etiqueta}</td>
+                    <td className="der mono">{dinero(f.pagado)}</td>
+                    <td className="der mono" style={{color:'var(--ambar)'}}>{dinero(f.pendiente)}</td>
+                    <td className="der mono" style={{fontWeight:700}}>{dinero(f.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="rejilla" style={{gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))'}}>
+        <div className="tarjeta">
+          <div className="tarjeta-cab"><h3>Ahorros</h3><span className="mono pos" style={{fontWeight:700}}>{dinero(ahorros.reduce((s,d)=>s+d.ahorro,0),true)}</span></div>
+          {ahorros.length===0?<p className="mini">Ningún ahorro todavía.</p>:ahorros.map((d)=>(
+            <div key={d.categoriaId} style={{display:'flex',justifyContent:'space-between',gap:10,padding:'9px 0',borderBottom:'1px solid var(--borde)'}}>
+              <span style={{display:'flex',alignItems:'center',gap:8}}><Icono n={d.icono} s={16} c="var(--menta)" /><span style={{fontSize:14}}>{d.nombre}</span></span>
+              <span className="mono pos" style={{fontWeight:600,flexShrink:0}}>{dinero(d.ahorro,true)}</span>
+            </div>
+          ))}
+        </div>
+        <div className="tarjeta">
+          <div className="tarjeta-cab"><h3>Sobrecostos</h3><span className="mono neg" style={{fontWeight:700}}>{dinero(excesos.reduce((s,d)=>s+d.sobrecosto,0),true)}</span></div>
+          {excesos.length===0?<p className="mini">Todo dentro del presupuesto.</p>:excesos.map((d)=>(
+            <div key={d.categoriaId} style={{display:'flex',justifyContent:'space-between',gap:10,padding:'9px 0',borderBottom:'1px solid var(--borde)'}}>
+              <span style={{display:'flex',alignItems:'center',gap:8}}><Icono n={d.icono} s={16} c="var(--rojo)" /><span style={{fontSize:14}}>{d.nombre}</span></span>
+              <span className="mono neg" style={{fontWeight:600,flexShrink:0}}>{dinero(d.sobrecosto,true)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   VISTA: PROYECTOS (cartera)
+   ============================================================ */
+const CHIP_PROYECTO = { activo: 'sano', pausado: 'alerta', terminado: 'neutro' };
+
+function Proyectos({ estado, dinero, accion, brindar, irA }) {
+  const [filtro, setFiltro] = useState('todos');
+  const [proy, setProy] = useState(null);
+  const [proyABorrar, setProyABorrar] = useState(null);
+  const [textoConfirm, setTextoConfirm] = useState('');
+  const cartera = useMemo(() => E.resumenCartera(estado, filtro), [estado, filtro]);
+  const t = cartera.totales;
+
+  const abrir = (p) => { accion((s) => ({ ...s, proyectoActivo: p.id })); irA('panel'); };
+
+  const guardarProy = () => {
+    if (!proy.nombre.trim()) return brindar('Nombre requerido.', 'err');
+    if (proy.id) {
+      accion((s) => ({ ...s, proyectos: s.proyectos.map((p) => p.id === proy.id ? { ...p, ...proy, nombre: proy.nombre.trim() } : p) }));
+    } else {
+      const nuevo = E.nuevoProyecto({ ...proy, nombre: proy.nombre.trim() });
+      accion((s) => ({ ...s, proyectos: s.proyectos.concat([nuevo]), categorias: s.categorias.concat(E.categoriasIniciales(nuevo.id)), proyectoActivo: nuevo.id }));
+    }
+    brindar(proy.id ? 'Actualizado.' : 'Creado con 12 categorías base.', 'ok');
+    setProy(null);
+  };
+
+  const ejecutarBorrado = () => {
+    const p = proyABorrar;
+    FOTOS.todas().then((fotos) => { const ids = estado.gastos.filter((g)=>g.proyectoId===p.id).map((g)=>g.id); fotos.filter((f)=>ids.includes(f.gastoId)).forEach((f)=>FOTOS.eliminar(f.id).catch(()=>{})); }).catch(()=>{});
+    accion((s) => {
+      const proyectos = s.proyectos.filter((x) => x.id !== p.id);
+      return { ...s, proyectos, categorias: s.categorias.filter((x) => x.proyectoId !== p.id), gastos: s.gastos.filter((x) => x.proyectoId !== p.id), licitaciones: s.licitaciones.filter((x) => x.proyectoId !== p.id), ordenes: (s.ordenes||[]).filter((x) => x.proyectoId !== p.id), contratos: (s.contratos||[]).filter((x) => x.proyectoId !== p.id), proyectoActivo: s.proyectoActivo === p.id ? (proyectos[0]||{}).id || null : s.proyectoActivo };
+    });
+    setProyABorrar(null); setTextoConfirm('');
+    brindar('Proyecto eliminado.', 'ok');
+  };
+
+  const cambiarEstado = (p, nuevo) => { accion((s) => ({ ...s, proyectos: s.proyectos.map((x) => x.id === p.id ? { ...x, estado: nuevo } : x) })); };
+
+  return (
+    <div className="rejilla" style={{gap:16}}>
+      <div className="rejilla kpis">
+        <Kpi etq="Proyectos" val={String(t.proyectos)} pie={t.excedidos>0?t.excedidos+' con sobrecosto':'todos en rango'} tono={t.excedidos>0?'rojo':''} />
+        <Kpi etq="Presupuesto total" val={dinero(t.presupuesto,true)} pie={t.movimientos+' movimientos'} />
+        <Kpi etq="Ejecutado total" val={dinero(t.gastado,true)} pie={t.ejecucion+'%'} />
+        <Kpi etq={t.saldo>=0?'Disponible':'Sobrecosto'} val={dinero(Math.abs(t.saldo),true)} tono={t.saldo>=0?'menta':'rojo'} />
+      </div>
+
+      <div className="tarjeta-cab" style={{marginBottom:0}}>
+        <div style={{display:'flex',gap:7,flexWrap:'wrap'}}>
+          {[['todos','Todos']].concat(E.ESTADOS_PROYECTO.map((e)=>[e.id,e.label])).map(([id,etq])=>(
+            <button key={id} className={'btn btn-sm'+(filtro===id?' btn-p':'')} onClick={()=>setFiltro(id)}>{etq}</button>
+          ))}
+        </div>
+        <button className="btn btn-p btn-sm" onClick={() => setProy({id:null,nombre:'',ubicacion:'',responsable:'',inicio:E.hoy(),fin:'',estado:'activo',notas:''})}>
+          <Icono n="mas" s={16} />Nuevo proyecto
+        </button>
+      </div>
+
+      {cartera.filas.length === 0 ? (
+        <div className="tarjeta"><Vacio icono="proyecto" titulo="Sin proyectos" texto="Crea el primero." /></div>
+      ) : (
+        <div className="rejilla" style={{gridTemplateColumns:'repeat(auto-fill,minmax(320px,1fr))'}}>
+          {cartera.filas.map((f) => {
+            const p = f.proyecto;
+            const esActivo = p.id === estado.proyectoActivo;
+            return (
+              <div className="tarjeta" key={p.id} style={esActivo?{borderColor:'rgba(242,169,59,.45)'}:null}>
+                <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'flex-start'}}>
+                  <div style={{minWidth:0}}>
+                    <div style={{fontWeight:700,fontSize:16}}>{p.nombre}</div>
+                    <div className="mini" style={{marginTop:3}}><Icono n="ubicacion" s={12} /> {p.ubicacion||'Sin ubicación'}</div>
+                  </div>
+                  <div style={{display:'flex',gap:5,flexShrink:0}}>
+                    {esActivo?<Chip estado="alerta" texto="Abierto" />:null}
+                    <Chip estado={CHIP_PROYECTO[p.estado||'activo']} texto={(E.ESTADOS_PROYECTO.find((e)=>e.id===(p.estado||'activo'))||{}).label||'Activo'} />
+                  </div>
+                </div>
+                <div style={{margin:'14px 0 8px'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',fontSize:12.5,marginBottom:6}}>
+                    <span className="mono">{dinero(f.v.gastado,true)} <span className="tenue">de {dinero(f.v.presupuesto,true)}</span></span>
+                    <span className="mono" style={{fontWeight:700}}>{f.v.ejecucion}%</span>
+                  </div>
+                  <Barra pct={f.v.ejecucion} estado={f.v.estado.id} />
+                </div>
+                <div className="sep" style={{margin:'12px 0 10px'}} />
+                <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
+                  <button className={'btn btn-sm'+(esActivo?'':' btn-p')} onClick={() => abrir(p)}><Icono n="derecha" s={15} />{esActivo?'Ir al panel':'Abrir'}</button>
+                  <select value={p.estado||'activo'} onChange={(e) => cambiarEstado(p,e.target.value)} style={{background:'var(--panel-2)',border:'1px solid var(--borde)',borderRadius:8,padding:'7px 9px',color:'var(--texto-2)',fontSize:13}}>
+                    {E.ESTADOS_PROYECTO.map((e)=><option key={e.id} value={e.id}>{e.label}</option>)}
+                  </select>
+                  <div style={{marginLeft:'auto',display:'flex',gap:2}}>
+                    <button className="btn-icono" onClick={() => setProy({...p})}><Icono n="lapiz" s={17} /></button>
+                    <button className="btn-icono" onClick={() => {setProyABorrar(p);setTextoConfirm('');}}><Icono n="basura" s={17} /></button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {proyABorrar ? (
+        <Modal titulo="Confirmar eliminación" onCerrar={() => {setProyABorrar(null);setTextoConfirm('');}}
+          pie={<React.Fragment><button className="btn" onClick={() => {setProyABorrar(null);setTextoConfirm('');}}>Cancelar</button><button className="btn btn-peligro" disabled={textoConfirm!=='Eliminar'} onClick={ejecutarBorrado}><Icono n="basura" s={16} />Borrar</button></React.Fragment>}>
+          <div className="aviso a-alto"><Icono n="alerta" s={18} /><span>Se borrarán el proyecto <strong>"{proyABorrar.nombre}"</strong> y todos sus datos. No se puede deshacer.</span></div>
+          <Campo etq="Escribe Eliminar para confirmar"><input autoFocus value={textoConfirm} placeholder="Eliminar" onChange={(e)=>setTextoConfirm(e.target.value)} /></Campo>
+        </Modal>
+      ) : null}
+
+      {proy ? (
+        <Modal titulo={proy.id?'Editar proyecto':'Nuevo proyecto'} onCerrar={() => setProy(null)}
+          pie={<React.Fragment><button className="btn" onClick={() => setProy(null)}>Cancelar</button><button className="btn btn-p" onClick={guardarProy}><Icono n="check" s={16} />Guardar</button></React.Fragment>}>
+          <Campo etq="Nombre"><input value={proy.nombre} autoFocus placeholder="Ej. Remodelación" onChange={(e)=>setProy({...proy,nombre:e.target.value})} /></Campo>
+          <div className="dos">
+            <Campo etq="Ubicación"><input value={proy.ubicacion||''} placeholder="Ej. Managua" onChange={(e)=>setProy({...proy,ubicacion:e.target.value})} /></Campo>
+            <Campo etq="Responsable"><input value={proy.responsable||''} onChange={(e)=>setProy({...proy,responsable:e.target.value})} /></Campo>
+          </div>
+          <div className="tres">
+            <Campo etq="Inicio"><input type="date" value={proy.inicio||''} onChange={(e)=>setProy({...proy,inicio:e.target.value})} /></Campo>
+            <Campo etq="Fin previsto"><input type="date" value={proy.fin||''} onChange={(e)=>setProy({...proy,fin:e.target.value})} /></Campo>
+            <Campo etq="Estado"><select value={proy.estado||'activo'} onChange={(e)=>setProy({...proy,estado:e.target.value})}>{E.ESTADOS_PROYECTO.map((e)=><option key={e.id} value={e.id}>{e.label}</option>)}</select></Campo>
+          </div>
+          <Campo etq="Notas"><textarea value={proy.notas||''} onChange={(e)=>setProy({...proy,notas:e.target.value})} /></Campo>
+        </Modal>
+      ) : null}
+    </div>
+  );
+}
+
+/* ============================================================
+   VISTA: AJUSTES
+   ============================================================ */
+function Ajustes({ estado, accion, brindar, instalar, puedeInstalar, irA }) {
+  const archivo = useRef(null);
+
+  const exportar = async () => {
+    const fotos = await FOTOS.todas().catch(() => []);
+    const paquete = Object.assign({}, estado, { fotos });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(paquete, null, 2)], { type: 'application/json' }));
+    a.download = 'obra-control-respaldo-' + E.hoy() + '.json'; a.click();
+    brindar('Respaldo descargado.', 'ok');
+  };
+
+  const importar = (ev) => {
+    const f = ev.target.files[0]; if (!f) return;
+    const lector = new FileReader();
+    lector.onload = async () => {
+      try {
+        const d = JSON.parse(lector.result);
+        if (!d || !Array.isArray(d.proyectos)) throw new Error('formato');
+        if (!confirm('Esto reemplaza todos los datos. ¿Continuar?')) return;
+        await FOTOS.vaciar().catch(() => {});
+        if (Array.isArray(d.fotos)) await FOTOS.restaurar(d.fotos).catch(() => {});
+        const { fotos, ...resto } = d;
+        accion(() => Object.assign(E.estadoVacio(), resto));
+        brindar('Respaldo restaurado.', 'ok');
+      } catch (e) { brindar('Archivo no válido.', 'err'); }
+      ev.target.value = '';
+    };
+    lector.readAsText(f);
+  };
+
+  return (
+    <div className="rejilla" style={{gap:16}}>
+      <div className="rejilla" style={{gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))'}}>
+        <div className="tarjeta">
+          <div className="tarjeta-cab"><h3>Preferencias</h3></div>
+          <Campo etq="Símbolo de moneda"><input value={estado.moneda} maxLength={5} onChange={(e)=>accion((s)=>({...s,moneda:e.target.value}))} /></Campo>
+          <p className="mini">Solo para mostrar. No convierte tipo de cambio.</p>
+          {puedeInstalar ? <React.Fragment><div className="sep" /><button className="btn btn-p" onClick={instalar}><Icono n="instalar" s={16} />Instalar en este dispositivo</button></React.Fragment> : null}
+        </div>
+        <div className="tarjeta">
+          <div className="tarjeta-cab"><h3>Respaldo de datos</h3></div>
+          <p className="mini" style={{marginTop:0,marginBottom:14,lineHeight:1.6}}>Los datos viven en este dispositivo. Descarga un respaldo para pasarlos a otro.</p>
+          <div style={{display:'flex',gap:9,flexWrap:'wrap'}}>
+            <button className="btn" onClick={exportar}><Icono n="bajar" s={16} />Descargar respaldo</button>
+            <button className="btn" onClick={() => archivo.current.click()}><Icono n="subir" s={16} />Restaurar</button>
+            <input ref={archivo} type="file" accept=".json" style={{display:'none'}} onChange={importar} />
+          </div>
+          <div className="sep" />
+          <button className="btn btn-peligro" onClick={() => {
+            if (!confirm('Esto borra TODO. ¿Seguro?')) return;
+            FOTOS.vaciar().catch(()=>{});
+            accion(()=>{const v=E.estadoVacio();const p=E.nuevoProyecto({nombre:'Mi primer proyecto'});v.proyectos=[p];v.categorias=E.categoriasIniciales(p.id);v.proyectoActivo=p.id;return v;});
+            brindar('Datos borrados.', 'ok');
+          }}><Icono n="basura" s={16} />Borrar todos los datos</button>
+        </div>
+      </div>
+      <div className="tarjeta">
+        <div className="tarjeta-cab"><h3>Navegación rápida</h3></div>
+        <div style={{display:'flex',gap:9,flexWrap:'wrap'}}>
+          <button className="btn" onClick={() => irA('proyectos')}><Icono n="proyecto" s={16} />Cartera</button>
+          <button className="btn" onClick={() => irA('ordenes')}><Icono n="orden" s={16} />Órdenes</button>
+          <button className="btn" onClick={() => irA('contratos')}><Icono n="contrato" s={16} />Contratos</button>
+          <button className="btn" onClick={() => irA('calendario')}><Icono n="calendario" s={16} />Calendario</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   APLICACIÓN
+   ============================================================ */
+const SECCIONES = [
+  { id: 'proyectos', etq: 'Proyectos', icono: 'proyecto' },
+  { id: 'panel', etq: 'Panel', icono: 'panel' },
+  { id: 'presupuesto', etq: 'Presupuesto', icono: 'presupuesto' },
+  { id: 'gastos', etq: 'Gastos', icono: 'gastos' },
+  { id: 'proveedores', etq: 'Proveedores', icono: 'mano_obra' },
+  { id: 'ofertas', etq: 'Ofertas', icono: 'ofertas' },
+  { id: 'ordenes', etq: 'Órdenes', icono: 'orden' },
+  { id: 'pagos', etq: 'Pagos', icono: 'pago' },
+  { id: 'contratos', etq: 'Contratos', icono: 'contrato' },
+  { id: 'calendario', etq: 'Calendario', icono: 'calendario' },
+  { id: 'reportes', etq: 'Reportes', icono: 'reportes' },
+  { id: 'ajustes', etq: 'Ajustes', icono: 'ajustes' },
+];
+const TABS_MOVIL = SECCIONES.filter((s) => ['proyectos','panel','gastos','ordenes','pagos','ofertas','reportes'].includes(s.id));
+
+function App() {
+  const [estado, setEstado] = useState(cargar);
+  const [vista, setVista] = useState('panel');
+  const [brindis, setBrindis] = useState(null);
+  const [promptPWA, setPromptPWA] = useState(null);
+  const [filtroGastos, setFiltroGastos] = useState(null);
+  const dinero = useDinero(estado.moneda || 'C$');
+
+  useEffect(() => { if (!guardar(estado)) setBrindis({ txt: 'No se pudo guardar.', tipo: 'err' }); }, [estado]);
+  useEffect(() => { const h = (e) => { e.preventDefault(); setPromptPWA(e); }; window.addEventListener('beforeinstallprompt', h); return () => window.removeEventListener('beforeinstallprompt', h); }, []);
+
+  const limpiezaHecha = useRef(false);
+  useEffect(() => { if (limpiezaHecha.current) return; limpiezaHecha.current = true; FOTOS.limpiarHuerfanas(estado.gastos.map((g)=>g.id)).catch(()=>{}); }, []);
+
+  useEffect(() => {
+    setEstado((s) => {
+      const existe = s.proyectos.some((p) => p.id === s.proyectoActivo);
+      if (!existe && s.proyectos.length > 0) return { ...s, proyectoActivo: s.proyectos[0].id };
+      return s;
+    });
+  }, [estado.proyectos.length]);
+
+  const brindar = (txt, tipo) => setBrindis({ txt, tipo: tipo || 'ok' });
+  useEffect(() => { if (!brindis) return; const t = setTimeout(() => setBrindis(null), 3200); return () => clearTimeout(t); }, [brindis]);
+
+  const accion = (fn) => setEstado((s) => fn(s));
+  const cambiarProyecto = (id) => { if (!id) return; setEstado((s) => s.proyectoActivo === id ? s : { ...s, proyectoActivo: id }); };
+  const irAGastosPendientes = () => { setFiltroGastos('pendientes'); setVista('gastos'); };
+
+  const proyecto = estado.proyectos.find((p) => p.id === estado.proyectoActivo) || null;
+  const v = useMemo(() => E.varianzaProyecto(estado.proyectoActivo, estado.categorias, estado.gastos), [estado.proyectoActivo, estado.categorias, estado.gastos]);
+  const avisos = useMemo(() => E.alertas(estado.proyectoActivo, estado.categorias, estado.gastos, estado.licitaciones), [estado.proyectoActivo, estado.categorias, estado.gastos, estado.licitaciones]);
+
+  const instalar = () => { if (!promptPWA) return; promptPWA.prompt(); setPromptPWA(null); };
+
+  if (!proyecto) {
+    return (
+      <div className="app">
+        <div className="principal" style={{margin:0,width:'100%',display:'grid',placeItems:'center',minHeight:'100vh'}}>
+          <div className="tarjeta" style={{maxWidth:420,textAlign:'center'}}>
+            <div className="marca-icono" style={{margin:'0 auto 16px'}}><Icono n="edificio" s={22} /></div>
+            <h2 style={{fontSize:24,textTransform:'uppercase',letterSpacing:'.06em'}}>Obra Control</h2>
+            <p className="mini" style={{margin:'10px 0 20px'}}>No hay proyectos. Crea el primero.</p>
+            <button className="btn btn-p" onClick={() => {
+              const p = E.nuevoProyecto({nombre:'Mi primer proyecto'});
+              accion((s)=>({...s,proyectos:[p],categorias:E.categoriasIniciales(p.id),proyectoActivo:p.id}));
+            }}><Icono n="mas" s={16} />Crear proyecto</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const contenido = {
+    proyectos: <Proyectos estado={estado} dinero={dinero} accion={accion} brindar={brindar} irA={setVista} />,
+    panel: <Panel estado={estado} v={v} alertas={avisos} dinero={dinero} irA={setVista} irAGastosPendientes={irAGastosPendientes} />,
+    presupuesto: <Presupuesto estado={estado} v={v} dinero={dinero} accion={accion} brindar={brindar} />,
+    gastos: <Gastos estado={estado} dinero={dinero} accion={accion} brindar={brindar} filtroInicial={filtroGastos} limpiarFiltroInicial={() => setFiltroGastos(null)} />,
+    proveedores: <Proveedores estado={estado} accion={accion} brindar={brindar} dinero={dinero} />,
+    ofertas: <Ofertas estado={estado} dinero={dinero} accion={accion} brindar={brindar} />,
+    ordenes: <Ordenes estado={estado} dinero={dinero} accion={accion} brindar={brindar} />,
+    pagos: <Pagos estado={estado} dinero={dinero} accion={accion} brindar={brindar} />,
+    contratos: <Contratos estado={estado} dinero={dinero} accion={accion} brindar={brindar} />,
+    calendario: <Calendario estado={estado} dinero={dinero} />,
+    reportes: <Reportes estado={estado} v={v} dinero={dinero} brindar={brindar} />,
+    ajustes: <Ajustes estado={estado} accion={accion} brindar={brindar} instalar={instalar} puedeInstalar={!!promptPWA} irA={setVista} />,
+  }[vista];
+
+  const titulos = {
+    proyectos:'Cartera de proyectos', panel:'Panel general', presupuesto:'Presupuesto',
+    gastos:'Gastos', proveedores:'Proveedores', ofertas:'Ofertas', ordenes:'Órdenes de compra',
+    pagos:'Pagos y adelantos', contratos:'Contratos', calendario:'Calendario de pagos', reportes:'Reportes', ajustes:'Ajustes',
+  };
+
+  return (
+    <div className="app">
+      <aside className="lateral">
+        <div className="marca">
+          <div className="marca-icono"><Icono n="edificio" s={21} /></div>
+          <div className="marca-txt">
+            <div className="n">Obra Control</div>
+            <div className="s">Gestión integral</div>
+          </div>
+        </div>
+        {SECCIONES.map((s, i) => (
+          <React.Fragment key={s.id}>
+            {(i === 9) ? <div className="nav-sep" /> : null}
+            <button className={'nav-btn' + (vista === s.id ? ' on' : '')} onClick={() => setVista(s.id)}>
+              <Icono n={s.icono} s={19} />{s.etq}
+            </button>
+          </React.Fragment>
+        ))}
+        <div className="lateral-pie">
+          <div style={{fontWeight:600,color:'var(--texto-2)'}}>{proyecto.nombre}</div>
+          <div style={{marginTop:3}}>{v.ejecucion}% ejecutado · {v.movimientos} mov.</div>
+        </div>
+      </aside>
+
+      <main className="principal">
+        <header className="cabecera">
+          <div>
+            <h1>{titulos[vista]}</h1>
+            <div className="sub">
+              {vista === 'proyectos'
+                ? estado.proyectos.length + ' proyecto(s)'
+                : proyecto.nombre + (proyecto.ubicacion ? ' · ' + proyecto.ubicacion : '')}
+            </div>
+          </div>
+          <div className="acciones">
+            {estado.proyectos.length > 1 && vista !== 'proyectos' ? (
+              <select value={estado.proyectoActivo} onChange={(e) => cambiarProyecto(e.target.value)}
+                style={{background:'var(--panel)',border:'1px solid var(--borde)',borderRadius:10,padding:'10px 12px',color:'var(--texto)',fontWeight:600,maxWidth:220}}>
+                {estado.proyectos.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+              </select>
+            ) : null}
+            {!['gastos','proyectos','proveedores','ordenes','contratos','pagos'].includes(vista) ? (
+              <button className="btn btn-p" onClick={() => setVista('gastos')}><Icono n="mas" s={16} />Registrar gasto</button>
+            ) : null}
+            <button className="btn ajustes-movil" onClick={() => setVista('ajustes')} title="Ajustes" style={{flex:'0 0 auto'}}>
+              <Icono n="ajustes" s={17} />
+            </button>
+          </div>
+        </header>
+        {contenido}
+      </main>
+
+      <nav className="barra-inf">
+        {TABS_MOVIL.map((s) => (
+          <button key={s.id} className={'tab' + (vista === s.id ? ' on' : '')} onClick={() => {setVista(s.id);window.scrollTo(0,0);}}>
+            <Icono n={s.icono} s={20} />{s.etq}
+          </button>
+        ))}
+      </nav>
+
+      {brindis ? (
+        <div className={'brindis ' + brindis.tipo}>
+          <Icono n={brindis.tipo === 'ok' ? 'check' : 'alerta'} s={17} />{brindis.txt}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('raiz')).render(<App />);
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function (e) {
+      console.log('Service worker no registrado:', e.message);
+    });
+  });
+}
+</script>
+</body>
+</html>
