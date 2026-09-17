@@ -85,7 +85,12 @@
                        pesos: { precio, calidad, tiempo, garantia },
                        ofertas: [{ id, proveedor, precioUnitario, total, dias,
                                    calidad, garantia, notas }],
-                       adjudicadaA: ofertaId | null, creado }]
+                       adjudicadaA: ofertaId | null, creado }],
+      fotosNube:    [{ id, gastoId, url, ancho, alto, bytes, creado }]
+                    // Índice de las fotos que ya están en el bucket de Supabase
+                    // Storage. Las imágenes en sí NO viven aquí (viajarían en
+                    // cada sincronización); esto solo dice "esta foto existe y
+                    // se descarga de esta URL". Ver supaFotos* en index.html.
     }
   */
   function estadoVacio() {
@@ -98,6 +103,7 @@
       gastos: [],
       licitaciones: [],
       proveedores: [],
+      fotosNube: [],
     };
   }
 
