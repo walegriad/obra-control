@@ -505,74 +505,6 @@ function supaEscuchar(onCambio) {
 }
 
 /* ============================================================
-   FOTOS EN LA NUBE — Supabase Storage
-   Las fotos se guardan localmente en IndexedDB (ver photos.js) y,
-   además, se suben al bucket de Storage para que otros dispositivos
-   las descarguen. Por la nube NO viaja la imagen dentro del estado
-   JSON (sería pesadísimo en cada sincronización); solo viaja un
-   índice liviano (estado.fotosNube) con la URL de cada foto. La
-   reconciliación entre ese índice y lo que hay en IndexedDB ocurre
-   en App() (ver fotosReconciliar).
-   ============================================================ */
-const SUPA_BUCKET_FOTOS = 'obra-fotos';
-
-function dataURLaBlob(dataURL) {
-  const partes = String(dataURL).split(',');
-  const mime = (partes[0].match(/data:(.*?);base64/) || [])[1] || 'image/jpeg';
-  const bin = atob(partes[1] || '');
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return new Blob([bytes], { type: mime });
-}
-
-function blobADataURL(blob) {
-  return new Promise((resolve, reject) => {
-    const lector = new FileReader();
-    lector.onerror = () => reject(new Error('No se pudo leer la foto descargada.'));
-    lector.onload = () => resolve(lector.result);
-    lector.readAsDataURL(blob);
-  });
-}
-
-// Sube una foto (registro de FOTOS, con su dataURL) al bucket y
-// devuelve la URL pública para guardarla en el índice.
-async function supaFotoSubir(registro) {
-  const ruta = registro.gastoId + '/' + registro.id + '.jpg';
-  const res = await fetch(
-    SUPA_URL + '/storage/v1/object/' + SUPA_BUCKET_FOTOS + '/' + ruta,
-    {
-      method: 'POST',
-      headers: {
-        'apikey': SUPA_KEY,
-        'Authorization': 'Bearer ' + SUPA_KEY,
-        'Content-Type': 'image/jpeg',
-        'x-upsert': 'true',
-      },
-      body: dataURLaBlob(registro.dataURL),
-    }
-  );
-  if (!res.ok) throw new Error('No se pudo subir la foto (HTTP ' + res.status + ').');
-  return SUPA_URL + '/storage/v1/object/public/' + SUPA_BUCKET_FOTOS + '/' + ruta;
-}
-
-// Descarga una foto por su URL pública y la devuelve como dataURL.
-async function supaFotoDescargar(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('No se pudo descargar la foto (HTTP ' + res.status + ').');
-  return blobADataURL(await res.blob());
-}
-
-// Borra una foto del bucket (silencioso si falla: no bloquea al usuario).
-async function supaFotoBorrar(gastoId, id) {
-  try {
-    await fetch(
-      SUPA_URL + '/storage/v1/object/' + SUPA_BUCKET_FOTOS + '/' + gastoId + '/' + id + '.jpg',
-      { method: 'DELETE', headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY } }
-    );
-  } catch { /* sin red — no importa, no queda referenciada desde ningún índice */ }
-}
-
-/* ============================================================
    PIEZAS REUTILIZABLES
    ============================================================ */
 function Kpi({ etq, val, pie, tono, onClick }) {
@@ -2801,103 +2733,6 @@ function App() {
   const [syncEstado, setSyncEstado] = useState('spin');
   const dinero = useDinero(estado.moneda || 'C$');
 
-  // ── Tiempo real: escuchar cambios de otros dispositivos ──
-  const estadoRef = useRef(estado);
-  useEffect(() => { estadoRef.current = estado; }, [estado]);
-
-  // Evita que el guardado local (efecto de abajo) suba datos a Supabase
-  // antes de que termine la carga inicial desde la nube. Sin esto, el
-  // primer render sube el estado local viejo mientras la descarga sigue
-  // en curso, y si la subida termina primero, borra lo que otro
-  // dispositivo ya había sincronizado.
-  const cargaInicialLista = useRef(false);
-  // Evita re-subir a Supabase un estado que acaba de llegar de la nube
-  // (el "eco" de nuestro propio polling), que además pisaba el
-  // 'actualizado' de la fila en cada ciclo de 8s.
-  const aplicandoRemoto = useRef(false);
-
-  /* ── Fotos en la nube ──────────────────────────────────────────
-     estado.fotosNube es un índice liviano {id, gastoId, url, ancho,
-     alto, bytes, creado} — la imagen vive en el bucket de Storage,
-     no en el JSON del estado. Cada dispositivo reconcilia su
-     IndexedDB local contra ese índice:
-       1) foto local que la nube no conoce todavía → subirla
-       2) foto en la nube que no está localmente     → bajarla
-       3) foto que confirmamos antes y ya no está en la nube
-          (la borraron en otro dispositivo)           → borrarla local
-       4) foto que confirmamos antes y ya no está local
-          (la borré yo en este dispositivo)            → avisar a la nube
-     'fotosConfirmadas' vive solo en memoria (se reinicia al recargar
-     la página) — es lo que permite distinguir "foto nueva, hay que
-     subirla" de "foto que ya no está en algún lado, hay que borrarla
-     en el otro" sin arriesgarse a borrar por error algo que este
-     dispositivo simplemente no ha descargado todavía. */
-  const fotosConfirmadas = useRef(new Set());
-  const fotosOcupado = useRef(false);
-  const fotosPendiente = useRef(false);
-
-  async function fotosReconciliar() {
-    if (fotosOcupado.current) { fotosPendiente.current = true; return; }
-    fotosOcupado.current = true;
-    try {
-      const locales = await FOTOS.todas().catch(() => []);
-      const idsLocales = new Set(locales.map((f) => f.id));
-      const nube = estadoRef.current.fotosNube || [];
-      const idsNube = new Set(nube.map((f) => f.id));
-
-      const nuevasParaNube = [];
-      for (const f of locales) {
-        if (idsNube.has(f.id) || fotosConfirmadas.current.has(f.id)) continue;
-        try {
-          const url = await supaFotoSubir(f);
-          nuevasParaNube.push({ id: f.id, gastoId: f.gastoId, url, ancho: f.ancho, alto: f.alto, bytes: f.bytes, creado: f.creado });
-          fotosConfirmadas.current.add(f.id);
-          idsNube.add(f.id);
-        } catch { /* sin red — se reintenta en el próximo ciclo */ }
-      }
-      if (nuevasParaNube.length > 0) {
-        setEstado((s) => ({ ...s, fotosNube: (s.fotosNube || []).concat(nuevasParaNube) }));
-      }
-
-      for (const f of nube) {
-        if (idsLocales.has(f.id)) { fotosConfirmadas.current.add(f.id); continue; }
-        try {
-          const dataURL = await supaFotoDescargar(f.url);
-          await FOTOS.restaurar([{ id: f.id, gastoId: f.gastoId, dataURL, ancho: f.ancho, alto: f.alto, bytes: f.bytes, creado: f.creado }]);
-          fotosConfirmadas.current.add(f.id);
-          idsLocales.add(f.id);
-        } catch { /* sin red — se reintenta en el próximo ciclo */ }
-      }
-
-      for (const id of Array.from(fotosConfirmadas.current)) {
-        if (!idsNube.has(id) && idsLocales.has(id)) {
-          await FOTOS.eliminar(id).catch(() => {});
-          fotosConfirmadas.current.delete(id);
-        }
-      }
-
-      const borradasAqui = [];
-      for (const id of fotosConfirmadas.current) {
-        if (idsNube.has(id) && !idsLocales.has(id)) borradasAqui.push(id);
-      }
-      if (borradasAqui.length > 0) {
-        setEstado((s) => ({ ...s, fotosNube: (s.fotosNube || []).filter((f) => borradasAqui.indexOf(f.id) === -1) }));
-        const gastoDe = {};
-        nube.forEach((f) => { gastoDe[f.id] = f.gastoId; });
-        borradasAqui.forEach((id) => {
-          fotosConfirmadas.current.delete(id);
-          supaFotoBorrar(gastoDe[id], id);
-        });
-      }
-    } finally {
-      fotosOcupado.current = false;
-      if (fotosPendiente.current) {
-        fotosPendiente.current = false;
-        fotosReconciliar();
-      }
-    }
-  }
-
   // ── Al arrancar: intentar traer datos de Supabase ──
   const syncArranqueHecho = useRef(false);
   useEffect(() => {
@@ -2906,31 +2741,11 @@ function App() {
     setSyncEstado('spin');
     supaCargar().then((nube) => {
       if (nube && nube.proyectos && nube.proyectos.length > 0) {
-        aplicandoRemoto.current = true;
         setEstado(nube);
         guardarLocal(nube);
-      } else {
-        // No hay nada en la nube todavía (fila nueva o primer dispositivo):
-        // subimos el estado local para crear/poblar la fila.
-        supaGuardar(estadoRef.current).catch(() => {});
       }
-      cargaInicialLista.current = true;
       setSyncEstado('ok');
-      fotosReconciliar();
-    }).catch(() => {
-      // Sin red al arrancar: igual dejamos subir cambios futuros del usuario,
-      // pero no tocamos la nube con el snapshot local de este arranque.
-      cargaInicialLista.current = true;
-      setSyncEstado('err');
-    });
-  }, []);
-
-  // Red de seguridad: además de reconciliar cuando llega un cambio remoto,
-  // se revisa cada 12s por si el usuario tomó una foto y este dispositivo
-  // todavía no la subió (por ejemplo, si en ese momento no había red).
-  useEffect(() => {
-    const t = setInterval(() => fotosReconciliar(), 12000);
-    return () => clearInterval(t);
+    }).catch(() => setSyncEstado('err'));
   }, []);
 
   // ── Guardar: localStorage inmediato + Supabase con debounce de 800ms ──
@@ -2938,13 +2753,6 @@ function App() {
   // múltiples escrituras a Supabase que se pisen entre sí.
   useEffect(() => {
     guardarLocal(estado);
-    if (aplicandoRemoto.current) {
-      // Este cambio de estado vino de la nube (polling), no del usuario:
-      // ya está sincronizado, no hace falta re-subirlo.
-      aplicandoRemoto.current = false;
-      return;
-    }
-    if (!cargaInicialLista.current) return; // esperar a que termine la carga inicial
     setSyncEstado('spin');
     const timer = setTimeout(() => {
       supaGuardar(estado)
@@ -2954,27 +2762,23 @@ function App() {
     return () => clearTimeout(timer);
   }, [estado]);
 
+  // ── Tiempo real: escuchar cambios de otros dispositivos ──
+  const estadoRef = useRef(estado);
+  useEffect(() => { estadoRef.current = estado; }, [estado]);
   useEffect(() => {
     const desuscribir = supaEscuchar((nuevoEstado) => {
-      // Comparamos TODO el estado sincronizable, no solo "proyectos".
-      // Antes, un cambio en gastos, proveedores o licitaciones no movía
-      // la aguja de "proyectos" y el polling lo ignoraba por completo:
-      // ese dispositivo nunca recibía el cambio, y su próximo guardado
-      // (con datos viejos) terminaba borrando lo que el otro había hecho.
-      const { proyectoActivo: _pa1, ...nubeComparable } = nuevoEstado;
-      const { proyectoActivo: _pa2, ...esteComparable } = estadoRef.current;
-      if (JSON.stringify(nubeComparable) !== JSON.stringify(esteComparable)) {
+      const tsNube = JSON.stringify(nuevoEstado.proyectos || []);
+      const tsEste = JSON.stringify(estadoRef.current.proyectos || []);
+      if (tsNube !== tsEste) {
         // Preservar el proyecto activo LOCAL — es una preferencia de UI por dispositivo.
         // Sin esto, el polling de Supabase revertía el cambio de proyecto que el usuario
         // acaba de hacer al traer el estado anterior de la nube.
         const estadoNube = Object.assign({}, nuevoEstado, {
           proyectoActivo: estadoRef.current.proyectoActivo,
         });
-        aplicandoRemoto.current = true;
         setEstado(estadoNube);
         guardarLocal(estadoNube);
         setBrindis({ txt: 'Datos actualizados desde otro dispositivo.', tipo: 'ok' });
-        fotosReconciliar();
       }
       setSyncEstado('ok');
     });

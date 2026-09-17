@@ -1,17 +1,1 @@
-{
-  "name": "Obra Control — Gestión integral de proyectos",
-  "short_name": "Obra Control",
-  "description": "Control de presupuesto, gastos, ofertas, órdenes de compra y contratos para proyectos de construcción.",
-  "start_url": "./index.html",
-  "scope": "./",
-  "display": "standalone",
-  "orientation": "portrait-primary",
-  "background_color": "#081113",
-  "theme_color": "#081113",
-  "lang": "es",
-  "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
-  ]
-}
+{"name":"Obra Firme — Control de proyectos","short_name":"Obra Firme","description":"Control de presupuesto, gastos y ofertas para proyectos de construcción.","start_url":"./index.html","scope":"./","display":"standalone","orientation":"portrait-primary","background_color":"#081113","theme_color":"#081113","lang":"es","icons":[{"src":"icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},{"src":"icon-512.png","sizes":"512x512","type":"image/png","purpose":"any"},{"src":"icon-maskable-512.png","sizes":"512x512","type":"image/png","purpose":"maskable"}]}

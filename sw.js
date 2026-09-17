@@ -1,4 +1,4 @@
-const VERSION = 'obra-control-v1';
+const VERSION = 'obra-firme-v3';
 const LOCALES = [
   './', './index.html', './engine.js', './photos.js',
   './manifest.json', './icon-192.png', './icon-512.png',
