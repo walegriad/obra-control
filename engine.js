@@ -1,8 +1,5 @@
 /* ============================================================
-   OBRA CONTROL — MOTOR DE DATOS Y CÁLCULO
-   Versión extendida de OBRA FIRME: incluye TODA la funcionalidad
-   original más órdenes de compra, flujo de caja, proveedores
-   mejorados, contratos y calendario de pagos.
+   OBRA FIRME — MOTOR DE DATOS Y CÁLCULO
    Archivo independiente y sin dependencias.
    Expone window.ENGINE (navegador) y module.exports (Node, para pruebas).
    ============================================================ */
@@ -29,15 +26,6 @@
   const nombreMes = (ym) => {
     const [a, m] = String(ym).split('-');
     return (MESES[parseInt(m, 10) - 1] || '?') + ' ' + a;
-  };
-
-  // Suma N meses (puede ser negativo) a un 'YYYY-MM', devuelve 'YYYY-MM'.
-  const sumarMeses = (ym, n) => {
-    const [a, m] = String(ym).split('-').map((x) => parseInt(x, 10));
-    const base = (a || 0) * 12 + ((m || 1) - 1) + num(n);
-    const anio = Math.floor(base / 12);
-    const mes = (base % 12 + 12) % 12;
-    return anio + '-' + String(mes + 1).padStart(2, '0');
   };
 
   /* ---------- catálogos ---------- */
@@ -84,21 +72,6 @@
     'Fase 5 — Cierre',
   ];
 
-  // Catálogo de estados para órdenes de compra.
-  const estadosOrden = [
-    { id: 'borrador', label: 'Borrador', color: 'gris' },
-    { id: 'aprobada', label: 'Aprobada', color: 'ambar' },
-    { id: 'recibida', label: 'Recibida', color: 'mint' },
-    { id: 'cancelada', label: 'Cancelada', color: 'rojo' },
-  ];
-
-  // Catálogo de estados para contratos.
-  const estadosContrato = [
-    { id: 'vigente', label: 'Vigente', color: 'ambar' },
-    { id: 'completado', label: 'Completado', color: 'mint' },
-    { id: 'cancelado', label: 'Cancelado', color: 'rojo' },
-  ];
-
   /* ---------- esquema del estado ---------- */
   /*
     estado = {
@@ -113,15 +86,11 @@
                        ofertas: [{ id, proveedor, precioUnitario, total, dias,
                                    calidad, garantia, notas }],
                        adjudicadaA: ofertaId | null, creado }],
-      proveedores:  [{ id, nombre, contacto, telefono, categorias, calificacion,
-                       condicionesPago, tiempoEntregaPromedio, notas }],
-      ordenes:      [{ id, proyectoId, categoriaId, numero, proveedor, fecha, fechaEntrega,
-                       items: [{descripcion, cantidad, unidad, marca, precioUnitario, total}],
-                       subtotal, impuesto, retencionIR, total, estado, notas, creado }],
-      contratos:    [{ id, proyectoId, proveedor, titulo, montoContrato, anticipo, retencion,
-                       fechaInicio, fechaFin, estado, avance, notas, creado }],
-      pagos:        [{ id, proyectoId, tipo, metodo, referencia, monto, fecha,
-                       proveedorId, trabajador, descripcion, notas, creado }]
+      fotosNube:    [{ id, gastoId, url, ancho, alto, bytes, creado }]
+                    // Índice de las fotos que ya están en el bucket de Supabase
+                    // Storage. Las imágenes en sí NO viven aquí (viajarían en
+                    // cada sincronización); esto solo dice "esta foto existe y
+                    // se descarga de esta URL". Ver supaFotos* en index.html.
     }
   */
   function estadoVacio() {
@@ -134,9 +103,7 @@
       gastos: [],
       licitaciones: [],
       proveedores: [],
-      ordenes: [],
-      contratos: [],
-      pagos: [],
+      fotosNube: [],
     };
   }
 
@@ -187,181 +154,6 @@
       fechaVencimiento,
       creado: g.creado || new Date().toISOString(),
     });
-  }
-
-  /* ============================================================
-     PROVEEDORES MEJORADOS
-     ============================================================ */
-
-  // Normaliza un proveedor con los campos ampliados.
-  function normalizarProveedor(p) {
-    return Object.assign({}, p, {
-      id: p.id || uid('pv'),
-      nombre: p.nombre || 'Sin nombre',
-      contacto: p.contacto || '',
-      telefono: p.telefono || '',
-      categorias: Array.isArray(p.categorias) ? p.categorias : [],
-      calificacion: Math.max(1, Math.min(5, num(p.calificacion) || 3)),
-      condicionesPago: p.condicionesPago || 'Contado',
-      tiempoEntregaPromedio: num(p.tiempoEntregaPromedio),
-      notas: p.notas || '',
-      creado: p.creado || new Date().toISOString(),
-    });
-  }
-
-  /* ============================================================
-     ÓRDENES DE COMPRA
-     ============================================================ */
-
-  // Recalcula totales de línea, subtotal y total de una orden de compra.
-  function normalizarOrden(o) {
-    const items = (o.items || []).map((it) => {
-      const cantidad = num(it.cantidad);
-      const precioUnitario = r2(it.precioUnitario);
-      const total = r2(cantidad * precioUnitario);
-      return Object.assign({}, it, { cantidad, precioUnitario, total, marca: it.marca || '', unidad: it.unidad || 'Unidad' });
-    });
-    const subtotal = r2(items.reduce((s, it) => s + it.total, 0));
-    const impuestoPct = r2(o.impuesto);
-    const retencionIR = o.retencionIR ? r2(subtotal * 0.02) : 0;
-    const impuesto = r2(subtotal * impuestoPct / 100);
-    const total = r2(subtotal + impuesto - retencionIR);
-    return Object.assign({}, o, {
-      id: o.id || uid('oc'),
-      numero: o.numero || ('OC-' + Date.now().toString().slice(-6)),
-      fecha: o.fecha || hoy(),
-      fechaEntrega: o.fechaEntrega || '',
-      items,
-      subtotal,
-      impuesto: impuestoPct,
-      retencionIR,
-      total,
-      estado: o.estado || 'borrador',
-      notas: o.notas || '',
-      creado: o.creado || new Date().toISOString(),
-    });
-  }
-
-  /* ============================================================
-     PAGOS (abonos, adelantos, anticipos)
-     ============================================================ */
-  const TIPOS_PAGO = [
-    { id: 'abono', label: 'Abono' },
-    { id: 'adelanto_material', label: 'Adelanto material' },
-    { id: 'adelanto_mano_obra', label: 'Adelanto mano de obra' },
-    { id: 'anticipo', label: 'Anticipo' },
-    { id: 'liquidacion', label: 'Liquidación' },
-  ];
-  const METODOS_PAGO = [
-    { id: 'efectivo', label: 'Efectivo' },
-    { id: 'transferencia', label: 'Transferencia' },
-    { id: 'cheque', label: 'Cheque' },
-    { id: 'tarjeta', label: 'Tarjeta' },
-    { id: 'otro', label: 'Otro' },
-  ];
-
-  function normalizarPago(p) {
-    return {
-      id: p.id || uid('pg'),
-      proyectoId: p.proyectoId,
-      tipo: p.tipo || 'abono',
-      metodo: p.metodo || 'efectivo',
-      referencia: p.referencia || '',
-      contratoId: p.contratoId || '',
-      monto: r2(p.monto),
-      fecha: p.fecha || hoy(),
-      proveedorId: p.proveedorId || '',
-      trabajador: p.trabajador || '',
-      descripcion: p.descripcion || '',
-      notas: p.notas || '',
-      creado: p.creado || new Date().toISOString(),
-    };
-  }
-
-  function historialPagos(pagos, filtro) {
-    let lista = pagos;
-    if (filtro.proyectoId) lista = lista.filter((p) => p.proyectoId === filtro.proyectoId);
-    if (filtro.tipo) lista = lista.filter((p) => p.tipo === filtro.tipo);
-    if (filtro.proveedorId) lista = lista.filter((p) => p.proveedorId === filtro.proveedorId);
-    if (filtro.trabajador) lista = lista.filter((p) => p.trabajador === filtro.trabajador);
-    return lista.sort((a, b) => a.fecha < b.fecha ? 1 : -1);
-  }
-
-  function resumenPagosContrato(pagos, contratoId) {
-    const propios = pagos.filter((p) => p.contratoId === contratoId);
-    return {
-      total: r2(propios.reduce((s, p) => s + num(p.monto), 0)),
-      cantidad: propios.length,
-      pagos: propios.sort((a, b) => a.fecha < b.fecha ? 1 : -1),
-    };
-  }
-
-  function resumenPagosProveedor(pagos, proveedorId) {
-    const propios = pagos.filter((p) => p.proveedorId === proveedorId);
-    return {
-      total: r2(propios.reduce((s, p) => s + num(p.monto), 0)),
-      cantidad: propios.length,
-      pagos: propios.sort((a, b) => a.fecha < b.fecha ? 1 : -1),
-    };
-  }
-
-  function resumenPagosTrabajador(pagos, trabajador) {
-    const propios = pagos.filter((p) => p.trabajador === trabajador);
-    return {
-      total: r2(propios.reduce((s, p) => s + num(p.monto), 0)),
-      cantidad: propios.length,
-      pagos: propios.sort((a, b) => a.fecha < b.fecha ? 1 : -1),
-    };
-  }
-
-  /* ============================================================
-     CONTRATOS
-     ============================================================ */
-
-  function normalizarContrato(c) {
-    const montoContrato = r2(c.montoContrato);
-    const anticipo = r2(c.anticipo);
-    const retencion = r2(c.retencion);
-    const avance = Math.max(0, Math.min(100, num(c.avance)));
-    return Object.assign({}, c, {
-      id: c.id || uid('ct2'),
-      titulo: c.titulo || 'Contrato sin título',
-      proveedor: c.proveedor || '',
-      montoContrato,
-      anticipo,
-      retencion,
-      fechaInicio: c.fechaInicio || hoy(),
-      fechaFin: c.fechaFin || '',
-      estado: c.estado || 'vigente',
-      avance,
-      notas: c.notas || '',
-      creado: c.creado || new Date().toISOString(),
-    });
-  }
-
-  // Compara lo pactado en el contrato contra los gastos reales asociados al mismo
-  // proveedor dentro del proyecto (proxy simple de "varianza de contrato").
-  function varianzaContrato(contrato, gastos) {
-    const relacionados = (gastos || []).filter(
-      (g) => g.proyectoId === contrato.proyectoId && g.proveedor === contrato.proveedor
-    );
-    const gastado = r2(relacionados.reduce((s, g) => s + num(g.monto), 0));
-    const montoContrato = r2(contrato.montoContrato);
-    const avanceEsperado = r2((montoContrato * num(contrato.avance)) / 100);
-    const saldo = r2(montoContrato - gastado);
-    const varianza = r2(gastado - avanceEsperado);
-    return {
-      contratoId: contrato.id,
-      titulo: contrato.titulo,
-      montoContrato,
-      gastado,
-      saldo,
-      avance: contrato.avance,
-      avanceEsperado,
-      varianza, // positivo = se ha gastado más de lo que el % de avance sugiere
-      movimientos: relacionados.length,
-      estado: clasificar(montoContrato, gastado),
-    };
   }
 
   /* ============================================================
@@ -458,26 +250,17 @@
 
   const PESOS_DEFECTO = { precio: 50, calidad: 25, tiempo: 15, garantia: 10 };
 
-  function totalOferta(oferta, cantOLic) {
+  function totalOferta(oferta, cantidad) {
+    const cant = num(cantidad);
     if (num(oferta.total) > 0) return r2(oferta.total);
-    var articulos = (typeof cantOLic === 'object') ? (cantOLic.articulos || []) : [];
-    if (articulos.length > 0) {
-      var precios = oferta.precios || [];
-      return r2(articulos.reduce(function(s, art) {
-        var p = precios.find(function(pr) { return pr.articuloId === art.id; });
-        return s + num(p ? p.precioUnitario : 0) * num(art.cantidad);
-      }, 0));
-    }
-    var cant = num(typeof cantOLic === 'object' ? cantOLic.cantidad : cantOLic);
     return r2(num(oferta.precioUnitario) * (cant > 0 ? cant : 1));
   }
 
   function compararOfertas(licitacion) {
     const pesos = Object.assign({}, PESOS_DEFECTO, licitacion.pesos || {});
     const cantidad = num(licitacion.cantidad);
-    const tieneArticulos = (licitacion.articulos || []).length > 0;
     const base = (licitacion.ofertas || []).map((o) => {
-      const total = totalOferta(o, licitacion);
+      const total = totalOferta(o, cantidad);
       return {
         id: o.id,
         proveedor: o.proveedor || 'Sin nombre',
@@ -898,285 +681,6 @@
     return { grupos: lista, totales: cartera.totales };
   }
 
-  /* ============================================================
-     FLUJO DE CAJA
-     ============================================================ */
-
-  // Flujo mensual: por cada mes, entradas (informativo — no se registran ingresos
-  // en el modelo original, así que "entradas" se deja en 0 salvo que se extienda
-  // más adelante), salidas (gastos pagados) y órdenes recibidas/pagadas, con saldo
-  // corriente acumulado (negativo del gasto acumulado, ya que no hay ingresos modelados).
-  function flujoMensual(proyectoId, gastos, ordenes) {
-    const gs = (gastos || []).filter((g) => g.proyectoId === proyectoId);
-    const ocs = (ordenes || []).filter((o) => o.proyectoId === proyectoId && o.estado !== 'cancelada');
-
-    const meses = {};
-    const bucket = (m) => {
-      if (!meses[m]) meses[m] = { mes: m, etiqueta: nombreMes(m), entradas: 0, salidas: 0, ordenes: 0, neto: 0 };
-      return meses[m];
-    };
-
-    gs.forEach((g) => {
-      const m = mesDe(g.fecha);
-      if (!m) return;
-      const b = bucket(m);
-      b.salidas = r2(b.salidas + num(g.monto));
-    });
-
-    ocs.forEach((o) => {
-      const m = mesDe(o.fecha);
-      if (!m) return;
-      const b = bucket(m);
-      b.ordenes = r2(b.ordenes + num(o.total));
-    });
-
-    const lista = Object.keys(meses).sort().map((k) => meses[k]);
-    let saldo = 0;
-    lista.forEach((m) => {
-      m.neto = r2(m.entradas - m.salidas);
-      saldo = r2(saldo + m.neto);
-      m.saldoAcumulado = saldo;
-    });
-    return lista;
-  }
-
-  // Proyección de flujo futuro basada en órdenes pendientes (aprobadas, no recibidas)
-  // y el patrón de gasto promedio de los últimos meses reales.
-  function proyeccionFlujo(proyectoId, gastos, ordenes, mesesFuturo) {
-    const nMeses = Math.max(1, num(mesesFuturo) || 3);
-    const historico = flujoMensual(proyectoId, gastos, ordenes);
-    const ultimosReales = historico.slice(-3);
-    const promedioSalidas = ultimosReales.length
-      ? r2(ultimosReales.reduce((s, m) => s + m.salidas, 0) / ultimosReales.length)
-      : 0;
-
-    const mesActual = mesDe(hoy());
-    const pendientes = (ordenes || []).filter(
-      (o) => o.proyectoId === proyectoId && (o.estado === 'aprobada' || o.estado === 'borrador')
-    );
-
-    let saldo = historico.length ? historico[historico.length - 1].saldoAcumulado : 0;
-    const out = [];
-    for (let i = 1; i <= nMeses; i++) {
-      const m = sumarMeses(mesActual, i);
-      // Órdenes pendientes cuya fecha de entrega cae en este mes futuro se suman como salida esperada.
-      const ordenesDelMes = pendientes.filter((o) => mesDe(o.fechaEntrega || o.fecha) === m);
-      const salidaOrdenes = r2(ordenesDelMes.reduce((s, o) => s + num(o.total), 0));
-      const salidaEstimada = r2(promedioSalidas + salidaOrdenes);
-      const neto = r2(-salidaEstimada);
-      saldo = r2(saldo + neto);
-      out.push({
-        mes: m,
-        etiqueta: nombreMes(m),
-        salidaEstimada,
-        salidaBase: promedioSalidas,
-        salidaOrdenes,
-        ordenesEsperadas: ordenesDelMes.length,
-        neto,
-        saldoProyectado: saldo,
-      });
-    }
-    return out;
-  }
-
-  /* ============================================================
-     PROVEEDORES: HISTORIAL Y RANKING
-     ============================================================ */
-
-  // Historial de compras con un proveedor a través de gastos, licitaciones adjudicadas y órdenes.
-  function historialProveedor(proveedorNombre, gastos, licitaciones, ordenes) {
-    const nombre = String(proveedorNombre || '').trim();
-    const gs = (gastos || []).filter((g) => (g.proveedor || '').trim() === nombre);
-    const ocs = (ordenes || []).filter((o) => (o.proveedor || '').trim() === nombre);
-    const licsGanadas = (licitaciones || []).filter((l) => {
-      if (!l.adjudicadaA) return false;
-      const of = (l.ofertas || []).filter((o) => o.id === l.adjudicadaA)[0];
-      return of && (of.proveedor || '').trim() === nombre;
-    });
-
-    const totalGastos = r2(gs.reduce((s, g) => s + num(g.monto), 0));
-    const totalOrdenes = r2(ocs.reduce((s, o) => s + num(o.total), 0));
-    const totalLicitaciones = r2(
-      licsGanadas.reduce((s, l) => {
-        const of = (l.ofertas || []).filter((o) => o.id === l.adjudicadaA)[0];
-        return s + (of ? totalOferta(of, l) : 0);
-      }, 0)
-    );
-
-    const totalGastado = r2(totalGastos + totalOrdenes);
-    const movimientos = gs.length + ocs.length;
-    const promedioOrden = movimientos > 0 ? r2(totalGastado / movimientos) : 0;
-
-    return {
-      proveedor: nombre,
-      gastos: gs,
-      ordenes: ocs,
-      licitacionesGanadas: licsGanadas,
-      totalGastos,
-      totalOrdenes,
-      totalLicitaciones,
-      totalGastado,
-      movimientos,
-      promedioOrden,
-    };
-  }
-
-  // Ranking de proveedores registrados por total gastado (gastos + órdenes), filtrable por estado (activo/etc no aplica aquí, se deja por si acaso).
-  function rankingProveedores(estado) {
-    const proveedores = (estado.proveedores || []).map((p) => normalizarProveedor(p));
-    const filas = proveedores.map((p) => {
-      const h = historialProveedor(p.nombre, estado.gastos, estado.licitaciones, estado.ordenes);
-      return Object.assign({ proveedor: p }, h);
-    });
-    filas.sort((a, b) => b.totalGastado - a.totalGastado);
-    return filas;
-  }
-
-  /* ============================================================
-     CALENDARIO DE PAGOS
-     ============================================================ */
-
-  // Eventos de pago (gastos al crédito con vencimiento, órdenes de compra con
-  // fecha de entrega pendiente de pago) que caen dentro de un mes 'YYYY-MM'.
-  function calendarioPagos(proyectoId, gastos, ordenes, contratos, mes) {
-    const m = mes || mesDe(hoy());
-    const out = [];
-
-    (gastos || [])
-      .filter((g) => g.proyectoId === proyectoId && g.pagado === false && g.fechaVencimiento && mesDe(g.fechaVencimiento) === m)
-      .forEach((g) => {
-        out.push({
-          tipo: 'gasto',
-          fecha: g.fechaVencimiento,
-          descripcion: g.descripcion || 'Gasto',
-          proveedor: g.proveedor || '',
-          monto: num(g.monto),
-          referencia: g.id,
-        });
-      });
-
-    (ordenes || [])
-      .filter((o) => o.proyectoId === proyectoId && (o.estado === 'aprobada' || o.estado === 'recibida') && o.fechaEntrega && mesDe(o.fechaEntrega) === m)
-      .forEach((o) => {
-        out.push({
-          tipo: 'orden',
-          fecha: o.fechaEntrega,
-          descripcion: 'Orden ' + o.numero,
-          proveedor: o.proveedor || '',
-          monto: num(o.total),
-          referencia: o.id,
-        });
-      });
-
-    (contratos || [])
-      .filter((c) => c.proyectoId === proyectoId && c.estado === 'vigente' && c.fechaFin && mesDe(c.fechaFin) === m)
-      .forEach((c) => {
-        const saldoPendiente = r2(num(c.montoContrato) - num(c.anticipo));
-        out.push({
-          tipo: 'contrato',
-          fecha: c.fechaFin,
-          descripcion: 'Cierre de contrato: ' + c.titulo,
-          proveedor: c.proveedor || '',
-          monto: saldoPendiente,
-          referencia: c.id,
-        });
-      });
-
-    out.sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0));
-    const total = r2(out.reduce((s, e) => s + num(e.monto), 0));
-    return { mes: m, etiqueta: nombreMes(m), eventos: out, total };
-  }
-
-  // Pagos que vencen dentro de los próximos N días (incluye vencidos), combinando
-  // gastos al crédito y entregas de órdenes de compra pendientes.
-  function proximosPagos(proyectoId, gastos, ordenes, dias) {
-    const horizonte = dias == null ? 15 : num(dias);
-    const out = [];
-
-    gastosProximosAVencer(proyectoId, gastos, horizonte).forEach((x) => {
-      out.push({
-        tipo: 'gasto',
-        fecha: x.gasto.fechaVencimiento,
-        dias: x.dias,
-        descripcion: x.gasto.descripcion || 'Gasto',
-        proveedor: x.gasto.proveedor || '',
-        monto: num(x.gasto.monto),
-        referencia: x.gasto.id,
-      });
-    });
-
-    (ordenes || [])
-      .filter((o) => o.proyectoId === proyectoId && o.estado === 'aprobada' && o.fechaEntrega)
-      .map((o) => ({ o, d: diasHasta(o.fechaEntrega) }))
-      .filter((x) => x.d !== null && x.d <= horizonte)
-      .forEach((x) => {
-        out.push({
-          tipo: 'orden',
-          fecha: x.o.fechaEntrega,
-          dias: x.d,
-          descripcion: 'Orden ' + x.o.numero,
-          proveedor: x.o.proveedor || '',
-          monto: num(x.o.total),
-          referencia: x.o.id,
-        });
-      });
-
-    out.sort((a, b) => a.dias - b.dias);
-    return out;
-  }
-
-  /* ============================================================
-     ESTADÍSTICAS AMPLIADAS
-     ============================================================ */
-
-  // Top N proveedores por gasto dentro de UN proyecto (solo gastos registrados, no órdenes).
-  function topProveedoresPorGasto(proyectoId, gastos, n) {
-    const gs = (gastos || []).filter((g) => g.proyectoId === proyectoId);
-    const mapa = {};
-    gs.forEach((g) => {
-      const nombre = (g.proveedor || 'Sin proveedor').trim() || 'Sin proveedor';
-      if (!mapa[nombre]) mapa[nombre] = { proveedor: nombre, total: 0, movimientos: 0 };
-      mapa[nombre].total = r2(mapa[nombre].total + num(g.monto));
-      mapa[nombre].movimientos += 1;
-    });
-    const lista = Object.keys(mapa).map((k) => mapa[k]);
-    lista.sort((a, b) => b.total - a.total);
-    return lista.slice(0, n == null ? 5 : num(n));
-  }
-
-  // Gastos agregados por tipo (material, mano_obra, equipo, etc.) para un proyecto.
-  function gastosPorTipo(proyectoId, gastos) {
-    const gs = (gastos || []).filter((g) => g.proyectoId === proyectoId);
-    const mapa = {};
-    TIPOS_GASTO.forEach((t) => (mapa[t.id] = { tipo: t.id, label: t.label, total: 0, movimientos: 0 }));
-    gs.forEach((g) => {
-      const t = g.tipo || 'otro';
-      if (!mapa[t]) mapa[t] = { tipo: t, label: t, total: 0, movimientos: 0 };
-      mapa[t].total = r2(mapa[t].total + num(g.monto));
-      mapa[t].movimientos += 1;
-    });
-    const totalGeneral = r2(gs.reduce((s, g) => s + num(g.monto), 0));
-    return Object.keys(mapa)
-      .map((k) => Object.assign({}, mapa[k], { porcentaje: pct(mapa[k].total, totalGeneral) }))
-      .sort((a, b) => b.total - a.total);
-  }
-
-  // Tendencia de gasto mensual: compara los últimos 3 meses reales para determinar
-  // si el gasto está subiendo, bajando o estable.
-  function tendenciaGasto(proyectoId, gastos) {
-    const meses = reporteMensual(proyectoId, [], gastos); // categorias no se necesitan para el total
-    const ultimos = meses.slice(-3);
-    if (ultimos.length < 2) {
-      return { tendencia: 'sin_datos', variacionPromedio: 0, meses: ultimos };
-    }
-    const variaciones = ultimos.slice(1).map((m) => m.variacionPct);
-    const variacionPromedio = r2(variaciones.reduce((s, v) => s + v, 0) / variaciones.length);
-    let tendencia = 'estable';
-    if (variacionPromedio > 10) tendencia = 'creciente';
-    else if (variacionPromedio < -10) tendencia = 'decreciente';
-    return { tendencia, variacionPromedio, meses: ultimos };
-  }
-
   /* ---------- datos de ejemplo (borrables desde Ajustes) ---------- */
   function proyectoDemo() {
     const p = nuevoProyecto({
@@ -1194,7 +698,6 @@
       normalizarGasto({ proyectoId: p.id, categoriaId, fecha, descripcion, proveedor, tipo, cantidad, unidad, precioUnitario, pagado: true });
     const hoyD = new Date();
     const f = (dias) => new Date(hoyD.getTime() - dias * 86400000).toISOString().slice(0, 10);
-    const fF = (dias) => new Date(hoyD.getTime() + dias * 86400000).toISOString().slice(0, 10);
     const gastos = [
       g(cat('Preliminares'), f(75), 'Limpieza y demolición', 'Cuadrilla local', 'mano_obra', 1, 'global', 22000),
       g(cat('Obra gris'), f(60), 'Cemento gris 42.5 kg', 'Ferretería Jenny', 'material', 180, 'bolsa', 385),
@@ -1225,58 +728,7 @@
         { id: uid('of'), proveedor: 'Importadora Piso Real', precioUnitario: 528, total: 0, dias: 7, calidad: 5, garantia: 24, notas: 'Entrega inmediata y garantía extendida.' },
       ],
     };
-
-    // Órdenes de compra de ejemplo para este proyecto.
-    const ordenes = [
-      normalizarOrden({
-        proyectoId: p.id,
-        categoriaId: cat('Obra gris'),
-        numero: 'OC-000101',
-        proveedor: 'Ferretería Jenny',
-        fecha: f(10),
-        fechaEntrega: fF(5),
-        items: [
-          { descripcion: 'Cemento gris 42.5 kg', cantidad: 100, unidad: 'bolsa', precioUnitario: 385 },
-          { descripcion: 'Varilla #3', cantidad: 40, unidad: 'qq', precioUnitario: 980 },
-        ],
-        impuesto: r2((100 * 385 + 40 * 980) * 0.15),
-        estado: 'aprobada',
-        notas: 'Entrega parcial acordada con el proveedor.',
-      }),
-      normalizarOrden({
-        proyectoId: p.id,
-        categoriaId: cat('Acabados'),
-        numero: 'OC-000102',
-        proveedor: 'Importadora Piso Real',
-        fecha: f(3),
-        fechaEntrega: fF(15),
-        items: [
-          { descripcion: 'Porcelanato 60x60', cantidad: 180, unidad: 'm²', precioUnitario: 528 },
-        ],
-        impuesto: r2(180 * 528 * 0.15),
-        estado: 'borrador',
-        notas: 'Pendiente de aprobación final.',
-      }),
-    ];
-
-    // Contrato de ejemplo.
-    const contratos = [
-      normalizarContrato({
-        proyectoId: p.id,
-        proveedor: 'Cuadrilla local',
-        titulo: 'Mano de obra general — remodelación completa',
-        montoContrato: 300000,
-        anticipo: 60000,
-        retencion: 15000,
-        fechaInicio: f(75),
-        fechaFin: fF(60),
-        estado: 'vigente',
-        avance: 45,
-        notas: 'Pago quincenal según avance certificado.',
-      }),
-    ];
-
-    return { proyecto: p, categorias: cats, gastos, licitaciones: [lic], ordenes, contratos };
+    return { proyecto: p, categorias: cats, gastos, licitaciones: [lic] };
   }
 
   // Segundo proyecto de ejemplo, más chico y con un sobrecosto visible.
@@ -1306,18 +758,7 @@
       g(cat('Pintura'), f(9), 'Aplicación de pintura', 'Cuadrilla Anexo', 'mano_obra', 1, 'global', 9800, false),
       g(cat('Eléctrico'), f(5), 'Reemplazo de luminarias', 'Eléctricos RC', 'material', 14, 'unidad', 890, false),
     ];
-    return { proyecto: p, categorias: cats, gastos, licitaciones: [], ordenes: [], contratos: [], pagos: [] };
-  }
-
-  // Catálogo de proveedores de ejemplo (con los campos ampliados).
-  function proveedoresDemo() {
-    return [
-      normalizarProveedor({ nombre: 'Ferretería Jenny', contacto: 'Jenny Ruiz', telefono: '8888-1111', categorias: ['material'], calificacion: 4, condicionesPago: '30 días crédito', tiempoEntregaPromedio: 3, notas: 'Proveedor principal de materiales.' }),
-      normalizarProveedor({ nombre: 'Techos MG', contacto: 'Marco Guevara', telefono: '8888-2222', categorias: ['material', 'mano_obra'], calificacion: 5, condicionesPago: 'Contado', tiempoEntregaPromedio: 7, notas: 'Especialista en techos.' }),
-      normalizarProveedor({ nombre: 'Cuadrilla local', contacto: 'Don Chepe', telefono: '8888-3333', categorias: ['mano_obra'], calificacion: 4, condicionesPago: 'Quincenal', tiempoEntregaPromedio: 0, notas: 'Cuadrilla de confianza, varios años de trabajo.' }),
-      normalizarProveedor({ nombre: 'Importadora Piso Real', contacto: 'Sandra Ríos', telefono: '8888-4444', categorias: ['material'], calificacion: 5, condicionesPago: '50% anticipo', tiempoEntregaPromedio: 15, notas: 'Buena garantía, entrega puntual.' }),
-      normalizarProveedor({ nombre: 'Eléctricos RC', contacto: 'Roberto Cruz', telefono: '8888-5555', categorias: ['material', 'mano_obra'], calificacion: 3, condicionesPago: 'Contado', tiempoEntregaPromedio: 5, notas: '' }),
-    ];
+    return { proyecto: p, categorias: cats, gastos, licitaciones: [] };
   }
 
   function estadoDemo() {
@@ -1328,40 +769,23 @@
     e.categorias = a.categorias.concat(b.categorias);
     e.gastos = a.gastos.concat(b.gastos);
     e.licitaciones = a.licitaciones.concat(b.licitaciones);
-    e.ordenes = (a.ordenes || []).concat(b.ordenes || []);
-    e.contratos = (a.contratos || []).concat(b.contratos || []);
-    e.proveedores = proveedoresDemo();
-    e.pagos = (a.pagos || []).concat(b.pagos || []);
     e.proyectoActivo = a.proyecto.id;
     return e;
   }
 
   const ENGINE = {
     // utilidades
-    num, r2, pct, uid, hoy, mesDe, nombreMes, sumarMeses,
+    num, r2, pct, uid, hoy, mesDe, nombreMes,
     // catálogos
     TIPOS_GASTO, CATEGORIAS_BASE, FASES, ICONOS, PESOS_DEFECTO, ESTADOS, ESTADOS_PROYECTO,
-    estadosOrden, estadosContrato,
     // esquema
     estadoVacio, estadoDemo, nuevoProyecto, categoriasIniciales, normalizarGasto, proyectoDemo,
-    normalizarProveedor, normalizarOrden, normalizarContrato, normalizarPago,
-    TIPOS_PAGO, METODOS_PAGO, historialPagos, resumenPagosContrato, resumenPagosProveedor, resumenPagosTrabajador,
     // motores
     clasificar, varianzaCategoria, varianzaProyecto,
     totalOferta, compararOfertas,
     reporteMensual, reportePorFase, alertas,
     diasHasta, gastosProximosAVencer,
     resumenCartera, clonarProyecto, ubicacionesUsadas, resumenPorUbicacion,
-    // flujo de caja
-    flujoMensual, proyeccionFlujo,
-    // proveedores mejorados
-    historialProveedor, rankingProveedores,
-    // contratos
-    varianzaContrato,
-    // calendario de pagos
-    calendarioPagos, proximosPagos,
-    // estadísticas ampliadas
-    topProveedoresPorGasto, gastosPorTipo, tendenciaGasto,
   };
 
   global.ENGINE = ENGINE;
