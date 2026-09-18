@@ -2358,6 +2358,7 @@ function Ordenes({ estado, dinero, accion, brindar }) {
   const imprimirOrden = (o) => {
     const esc = (s) => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const w = window.open('', '_blank');
+    if (!w) return brindar('El navegador bloqueó la ventana de impresión. Permite las ventanas emergentes e intenta de nuevo.', 'err');
     const rows = o.items.map((it, i) => '<tr><td>'+(i+1)+'</td><td>'+esc(it.descripcion)+(it.marca?' — '+esc(it.marca):'')+'</td><td class="c">'+it.cantidad+' '+esc(it.unidad)+'</td><td class="r">'+dinero(it.precioUnitario)+'</td><td class="r">'+dinero(E.r2(it.cantidad*it.precioUnitario))+'</td></tr>').join('');
     w.document.write('<!DOCTYPE html><html><head><title>'+o.numero+'</title><style>body{font-family:Arial,sans-serif;padding:30px;color:#222}h1{font-size:18px}table{width:100%;border-collapse:collapse;margin:20px 0}th,td{border:1px solid #ccc;padding:8px;text-align:left;font-size:13px}.c{text-align:center}.r{text-align:right}th{background:#f5f5f5}.tot{font-weight:700}.head{text-align:center;margin-bottom:20px}.head h2{margin:0;font-size:16px}.head p{margin:3px 0;font-size:12px;color:#555}.firma{display:flex;justify-content:space-between;margin-top:60px}.firma div{text-align:center;width:200px;border-top:1px solid #333;padding-top:8px;font-size:12px}@media print{body{padding:15px}}</style></head><body>');
     w.document.write('<div class="head"><h2>Iglesia Oasis de Amor</h2><p>RUC: J0810000163807</p><p>Km 10 carretera nueva a León contiguo a DIINSA Ciudad Sandino Managua</p><p>Tel. 22691293</p></div>');
@@ -2700,7 +2701,7 @@ function CalendarioPagos({ estado, dinero }) {
   const mesAnterior = () => { const d = new Date(anio, mes - 2, 1); setMesActual(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0')); setDiaSel(null); };
   const mesSiguiente = () => { const d = new Date(anio, mes, 1); setMesActual(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0')); setDiaSel(null); };
 
-  const eventosVista = diaSel ? (eventosPorDia[diaSel] || []) : eventos.sort((a,b) => a.fecha < b.fecha ? -1 : 1);
+  const eventosVista = diaSel ? (eventosPorDia[diaSel] || []) : [...eventos].sort((a,b) => a.fecha < b.fecha ? -1 : 1);
   const totalVista = E.r2(eventosVista.reduce((s,ev) => s + E.num(ev.monto), 0));
 
   return (

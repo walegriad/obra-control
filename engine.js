@@ -932,7 +932,7 @@
       normalizarOrden({ proyectoId: p.id, numero: 'OC-001', proveedor: 'Ferretería Jenny', estado: 'aprobada', iva: 15, fechaEntrega: f(-5),
         items: [{ descripcion: 'Cemento gris 42.5 kg', cantidad: 50, unidad: 'bolsa', precioUnitario: 385, marca: 'Canal' },
                 { descripcion: 'Arena lavada', cantidad: 8, unidad: 'm3', precioUnitario: 1450, marca: '' }],
-        solicitadoPor: 'Walter', aprobadoPor: 'Walter', fechaAprobacion: f(10) }),
+        solicitadoPor: 'Walter', aprobadoPor: 'Walter', fechaAprobacion: f(10), aplicaRetencionIR: true }),
       normalizarOrden({ proyectoId: p.id, numero: 'OC-002', proveedor: 'Techos MG', estado: 'solicitada', iva: 15,
         items: [{ descripcion: 'Lámina troquelada cal. 26', cantidad: 30, unidad: 'lám', precioUnitario: 1180, marca: 'Metalco' }],
         solicitadoPor: 'Walter' }),
@@ -940,7 +940,7 @@
     // Contrato de ejemplo
     const contratos = [
       normalizarContrato({ proyectoId: p.id, proveedor: 'Cuadrilla local', titulo: 'Mano de obra general — remodelación completa',
-        montoContrato: 300000, anticipo: 60000, retencion: 15000, fechaInicio: f(70), fechaFin: f(-30),
+        montoContrato: 300000, anticipo: 20, retencion: 5, fechaInicio: f(70), fechaFin: f(-30),
         estado: 'vigente', avance: 45, notas: 'Pago quincenal según avance certificado.' }),
     ];
     // Pagos de ejemplo
