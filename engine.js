@@ -19,7 +19,7 @@
   const uid = (p) =>
     p + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
-  const hoy = () => new Date().toISOString().slice(0, 10);
+  const hoy = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
   const mesDe = (fecha) => String(fecha || '').slice(0, 7); // YYYY-MM
 
   const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -203,8 +203,10 @@
       marca: it.marca || '',
     }));
     const subtotal = r2(items.reduce((s, it) => s + r2(it.cantidad * it.precioUnitario), 0));
-    const impuesto = r2(subtotal * num(o.iva || 0) / 100);
-    const retencionIR = o.retencionIR ? r2(subtotal * 0.02) : 0;
+    const ivaRate = num(o.iva != null ? o.iva : 15);
+    const aplicaIR = !!o.aplicaRetencionIR;
+    const impuesto = r2(subtotal * ivaRate / 100);
+    const retencionIR = aplicaIR ? r2(subtotal * 0.02) : 0;
     const total = r2(subtotal + impuesto - retencionIR);
     return {
       id: o.id || uid('oc'),
@@ -214,8 +216,8 @@
       estado: o.estado || 'borrador',
       items,
       subtotal, impuesto, retencionIR, total,
-      iva: num(o.iva || 15),
-      retencionIR: !!o.retencionIR,
+      iva: ivaRate,
+      aplicaRetencionIR: aplicaIR,
       fechaCreacion: o.fechaCreacion || hoy(),
       fechaAprobacion: o.fechaAprobacion || '',
       fechaEntrega: o.fechaEntrega || '',
@@ -277,7 +279,7 @@
     return {
       total: r2(propios.reduce((s, p) => s + num(p.monto), 0)),
       cantidad: propios.length,
-      pagos: propios.sort((a, b) => a.fecha < b.fecha ? 1 : -1),
+      pagos: propios.sort((a, b) => a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0),
     };
   }
 
@@ -819,7 +821,17 @@
         })
       );
 
-    return { proyecto: p, categorias, gastos, licitaciones };
+    const ordenes = incluirGastos
+      ? (estado.ordenes || []).filter((o) => o.proyectoId === proyectoId)
+          .map((o) => normalizarOrden(Object.assign({}, o, { id: uid('oc'), proyectoId: p.id, estado: 'borrador', creado: new Date().toISOString() })))
+      : [];
+
+    const contratos = incluirGastos
+      ? (estado.contratos || []).filter((c) => c.proyectoId === proyectoId)
+          .map((c) => normalizarContrato(Object.assign({}, c, { id: uid('co'), proyectoId: p.id, creado: new Date().toISOString() })))
+      : [];
+
+    return { proyecto: p, categorias, gastos, licitaciones, ordenes, contratos, pagos: [] };
   }
 
   // Ubicaciones ya usadas en algún proyecto, para autocompletar sin repetir texto
@@ -968,7 +980,7 @@
       g(cat('Pintura'), f(9), 'Aplicación de pintura', 'Cuadrilla Anexo', 'mano_obra', 1, 'global', 9800, false),
       g(cat('Eléctrico'), f(5), 'Reemplazo de luminarias', 'Eléctricos RC', 'material', 14, 'unidad', 890, false),
     ];
-    return { proyecto: p, categorias: cats, gastos, licitaciones: [] };
+    return { proyecto: p, categorias: cats, gastos, licitaciones: [], ordenes: [], contratos: [], pagos: [] };
   }
 
   function estadoDemo() {

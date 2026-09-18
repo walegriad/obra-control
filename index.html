@@ -35,6 +35,9 @@
   --menta-oscuro:#1E8F6B;
   --rojo:#F2705B;
   --rojo-oscuro:#B03A28;
+  --azul:#5BA8F2;
+  --fondo-elev:var(--panel-2);
+  --ambar-20:rgba(242,169,59,.2);
   --sidebar:248px;
   --radio:14px;
   --radio-sm:10px;
@@ -357,6 +360,7 @@ const TRAZOS = {
   pago:'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM12 6v6l4 2',
   imprimir:'M6 9V2h12v7M6 18H4v-5h16v5h-2M6 14h12v7H6z',
   estrella:'M12 2l3 5 6 1-4.5 4 1 6-5.5-3-5.5 3 1-6L3 8l6-1z',
+  telefono:'M6.6 10.8a15.3 15.3 0 006.6 6.6l2.2-2.2a1 1 0 011-.2 11.4 11.4 0 003.6.6 1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1 11.4 11.4 0 00.6 3.6 1 1 0 01-.3 1z',
 };
 function Icono({ n, s = 20, c }) {
   const def = TRAZOS[n] || TRAZOS.info;
@@ -2310,16 +2314,17 @@ function Ordenes({ estado, dinero, accion, brindar }) {
 
   const itemVacio = () => ({ descripcion: '', cantidad: 1, unidad: 'unidad', precioUnitario: '', marca: '' });
   const abrirNueva = () => {
-    const n = (ordenes.length + 1);
+    const todas = (estado.ordenes || []).filter((o) => o.proyectoId === estado.proyectoActivo);
+    const n = (todas.length + 1);
     setForm({ id: null, numero: 'OC-' + String(n).padStart(3, '0'), proveedor: '', estado: 'borrador',
-      items: [itemVacio()], iva: '15', retencionIR: false, fechaCreacion: E.hoy(), fechaEntrega: '',
+      items: [itemVacio()], iva: '15', aplicaRetencionIR: false, fechaCreacion: E.hoy(), fechaEntrega: '',
       solicitadoPor: '', aprobadoPor: '', notas: '', _esNuevo: true });
   };
 
   const totalForm = () => {
     const sub = E.r2((form.items || []).reduce((s, it) => s + E.r2(E.num(it.cantidad) * E.num(it.precioUnitario)), 0));
     const imp = E.r2(sub * E.num(form.iva) / 100);
-    const ir = form.retencionIR ? E.r2(sub * 0.02) : 0;
+    const ir = form.aplicaRetencionIR ? E.r2(sub * 0.02) : 0;
     return { subtotal: sub, impuesto: imp, retencionIR: ir, total: E.r2(sub + imp - ir) };
   };
 
@@ -2351,16 +2356,17 @@ function Ordenes({ estado, dinero, accion, brindar }) {
   const etqEst = (e) => (E.ESTADOS_ORDEN.find((x) => x.id === e) || { label: e }).label;
 
   const imprimirOrden = (o) => {
+    const esc = (s) => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const w = window.open('', '_blank');
-    const rows = o.items.map((it, i) => '<tr><td>'+(i+1)+'</td><td>'+it.descripcion+(it.marca?' — '+it.marca:'')+'</td><td class="c">'+it.cantidad+' '+it.unidad+'</td><td class="r">'+dinero(it.precioUnitario)+'</td><td class="r">'+dinero(E.r2(it.cantidad*it.precioUnitario))+'</td></tr>').join('');
+    const rows = o.items.map((it, i) => '<tr><td>'+(i+1)+'</td><td>'+esc(it.descripcion)+(it.marca?' — '+esc(it.marca):'')+'</td><td class="c">'+it.cantidad+' '+esc(it.unidad)+'</td><td class="r">'+dinero(it.precioUnitario)+'</td><td class="r">'+dinero(E.r2(it.cantidad*it.precioUnitario))+'</td></tr>').join('');
     w.document.write('<!DOCTYPE html><html><head><title>'+o.numero+'</title><style>body{font-family:Arial,sans-serif;padding:30px;color:#222}h1{font-size:18px}table{width:100%;border-collapse:collapse;margin:20px 0}th,td{border:1px solid #ccc;padding:8px;text-align:left;font-size:13px}.c{text-align:center}.r{text-align:right}th{background:#f5f5f5}.tot{font-weight:700}.head{text-align:center;margin-bottom:20px}.head h2{margin:0;font-size:16px}.head p{margin:3px 0;font-size:12px;color:#555}.firma{display:flex;justify-content:space-between;margin-top:60px}.firma div{text-align:center;width:200px;border-top:1px solid #333;padding-top:8px;font-size:12px}@media print{body{padding:15px}}</style></head><body>');
     w.document.write('<div class="head"><h2>Iglesia Oasis de Amor</h2><p>RUC: J0810000163807</p><p>Km 10 carretera nueva a León contiguo a DIINSA Ciudad Sandino Managua</p><p>Tel. 22691293</p></div>');
-    w.document.write('<h1>Orden de Compra: '+o.numero+'</h1>');
-    w.document.write('<p><b>Proveedor:</b> '+o.proveedor+' | <b>Fecha:</b> '+fFecha(o.fechaCreacion)+' | <b>Estado:</b> '+etqEst(o.estado)+'</p>');
+    w.document.write('<h1>Orden de Compra: '+esc(o.numero)+'</h1>');
+    w.document.write('<p><b>Proveedor:</b> '+esc(o.proveedor)+' | <b>Fecha:</b> '+fFecha(o.fechaCreacion)+' | <b>Estado:</b> '+esc(etqEst(o.estado))+'</p>');
     w.document.write('<table><thead><tr><th>#</th><th>Descripción</th><th class="c">Cantidad</th><th class="r">P. Unit.</th><th class="r">Total</th></tr></thead><tbody>'+rows+'</tbody></table>');
-    w.document.write('<table style="width:250px;margin-left:auto"><tr><td>Subtotal</td><td class="r">'+dinero(o.subtotal)+'</td></tr><tr><td>IVA ('+o.iva+'%)</td><td class="r">'+dinero(o.impuesto)+'</td></tr>'+(o.retencionIR?'<tr><td>IR 2%</td><td class="r">-'+dinero(o.retencionIR)+'</td></tr>':'')+'<tr class="tot"><td>TOTAL</td><td class="r">'+dinero(o.total)+'</td></tr></table>');
-    if (o.notas) w.document.write('<p><b>Notas:</b> '+o.notas+'</p>');
-    w.document.write('<div class="firma"><div>'+(o.solicitadoPor||'___________')+'<br>Solicitado por</div><div>'+(o.aprobadoPor||'___________')+'<br>Aprobado por</div><div>___________<br>Recibido por</div></div>');
+    w.document.write('<table style="width:250px;margin-left:auto"><tr><td>Subtotal</td><td class="r">'+dinero(o.subtotal)+'</td></tr><tr><td>IVA ('+o.iva+'%)</td><td class="r">'+dinero(o.impuesto)+'</td></tr>'+(o.aplicaRetencionIR?'<tr><td>IR 2%</td><td class="r">-'+dinero(o.retencionIR)+'</td></tr>':'')+'<tr class="tot"><td>TOTAL</td><td class="r">'+dinero(o.total)+'</td></tr></table>');
+    if (o.notas) w.document.write('<p><b>Notas:</b> '+esc(o.notas)+'</p>');
+    w.document.write('<div class="firma"><div>'+esc(o.solicitadoPor||'___________')+'<br>Solicitado por</div><div>'+esc(o.aprobadoPor||'___________')+'<br>Aprobado por</div><div>___________<br>Recibido por</div></div>');
     w.document.write('</body></html>');
     w.document.close();
     w.print();
@@ -2396,7 +2402,7 @@ function Ordenes({ estado, dinero, accion, brindar }) {
                       {o.estado === 'solicitada' ? <button className="btn btn-sm" onClick={() => cambiarEstado(o,'aprobada')} title="Aprobar" style={{color:'var(--menta)'}}>Aprobar</button> : null}
                       {o.estado === 'aprobada' ? <button className="btn btn-sm" onClick={() => cambiarEstado(o,'recibida')} title="Recibir" style={{color:'var(--menta)'}}>Recibir</button> : null}
                       <button className="btn-icono" onClick={() => imprimirOrden(o)} title="Imprimir"><Icono n="imprimir" s={17} /></button>
-                      <button className="btn-icono" onClick={() => setForm({...o, iva: String(o.iva), items: o.items.map((it) => ({...it, precioUnitario: String(it.precioUnitario)})), _esNuevo: false})}><Icono n="lapiz" s={17} /></button>
+                      <button className="btn-icono" onClick={() => setForm({...o, iva: String(o.iva), aplicaRetencionIR: !!o.aplicaRetencionIR, items: o.items.map((it) => ({...it, precioUnitario: String(it.precioUnitario)})), _esNuevo: false})}><Icono n="lapiz" s={17} /></button>
                       <button className="btn-icono" onClick={() => borrarOrden(o)}><Icono n="basura" s={17} /></button>
                     </td>
                   </tr>
@@ -2436,7 +2442,7 @@ function Ordenes({ estado, dinero, accion, brindar }) {
             <Campo etq="IVA (%)"><input className="mono" inputMode="decimal" value={form.iva} onChange={(e) => setForm({...form,iva:e.target.value})} /></Campo>
             <Campo etq="IR 2% retención">
               <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:14}}>
-                <input type="checkbox" checked={form.retencionIR} onChange={(e) => setForm({...form,retencionIR:e.target.checked})} />
+                <input type="checkbox" checked={form.aplicaRetencionIR} onChange={(e) => setForm({...form,aplicaRetencionIR:e.target.checked})} />
                 Aplicar retención IR 2%
               </label>
             </Campo>
@@ -2446,7 +2452,7 @@ function Ordenes({ estado, dinero, accion, brindar }) {
             <div style={{background:'var(--fondo-elev)',borderRadius:8,padding:'12px 16px',marginTop:14,fontSize:13}}>
               <div style={{display:'flex',justifyContent:'space-between'}}><span className="tenue">Subtotal</span><span className="mono">{dinero(t.subtotal)}</span></div>
               <div style={{display:'flex',justifyContent:'space-between',marginTop:4}}><span className="tenue">IVA</span><span className="mono">{dinero(t.impuesto)}</span></div>
-              {form.retencionIR ? <div style={{display:'flex',justifyContent:'space-between',marginTop:4}}><span className="tenue">IR 2%</span><span className="mono">-{dinero(t.retencionIR)}</span></div> : null}
+              {form.aplicaRetencionIR ? <div style={{display:'flex',justifyContent:'space-between',marginTop:4}}><span className="tenue">IR 2%</span><span className="mono">-{dinero(t.retencionIR)}</span></div> : null}
               <div style={{display:'flex',justifyContent:'space-between',marginTop:8,fontWeight:700,fontSize:15}}><span>TOTAL</span><span className="mono">{dinero(t.total)}</span></div>
             </div>
           ); })()}
@@ -2686,7 +2692,7 @@ function CalendarioPagos({ estado, dinero }) {
   const DIAS_SEM = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
   const MESES_LARGO = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-  const eventos = useMemo(() => E.calendarioPagos(estado.proyectoActivo, estado.gastos, estado.ordenes||[], estado.contratos||[], estado.pagos||[], mesActual), [estado, mesActual]);
+  const eventos = useMemo(() => E.calendarioPagos(estado.proyectoActivo, estado.gastos, estado.ordenes||[], estado.contratos||[], estado.pagos||[], mesActual), [estado.proyectoActivo, estado.gastos, estado.ordenes, estado.contratos, estado.pagos, mesActual]);
 
   const eventosPorDia = {};
   eventos.forEach((ev) => { const d = parseInt(ev.fecha.split('-')[2], 10); if (!eventosPorDia[d]) eventosPorDia[d] = []; eventosPorDia[d].push(ev); });
@@ -2701,7 +2707,7 @@ function CalendarioPagos({ estado, dinero }) {
     <div className="rejilla" style={{gap:16}}>
       <div className="tarjeta">
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
-          <button className="btn btn-sm" onClick={mesAnterior}><Icono n="derecha" s={16} c="var(--texto-2)" /></button>
+          <button className="btn btn-sm" onClick={mesAnterior} style={{transform:'scaleX(-1)'}}><Icono n="derecha" s={16} c="var(--texto-2)" /></button>
           <h3 style={{fontSize:18}}>{MESES_LARGO[mes-1]} {anio}</h3>
           <button className="btn btn-sm" onClick={mesSiguiente}><Icono n="derecha" s={16} /></button>
         </div>
@@ -2887,6 +2893,9 @@ function Proyectos({ estado, dinero, accion, brindar, irA }) {
         categorias: s.categorias.concat(c.categorias),
         gastos: s.gastos.concat(c.gastos),
         licitaciones: s.licitaciones.concat(c.licitaciones),
+        ordenes: (s.ordenes||[]).concat(c.ordenes||[]),
+        contratos: (s.contratos||[]).concat(c.contratos||[]),
+        pagos: (s.pagos||[]).concat(c.pagos||[]),
         proyectoActivo: c.proyecto.id,
       };
     });
@@ -2913,6 +2922,9 @@ function Proyectos({ estado, dinero, accion, brindar, irA }) {
         categorias: s.categorias.filter((x) => x.proyectoId !== p.id),
         gastos: s.gastos.filter((x) => x.proyectoId !== p.id),
         licitaciones: s.licitaciones.filter((x) => x.proyectoId !== p.id),
+        ordenes: (s.ordenes||[]).filter((x) => x.proyectoId !== p.id),
+        contratos: (s.contratos||[]).filter((x) => x.proyectoId !== p.id),
+        pagos: (s.pagos||[]).filter((x) => x.proyectoId !== p.id),
         proyectoActivo: s.proyectoActivo === p.id ? (proyectos[0] || {}).id || null : s.proyectoActivo,
       };
     });
@@ -3153,7 +3165,7 @@ function Proveedores({ estado, accion, brindar }) {
                 </div>
                 {p.categoria ? <div style={{marginTop:6}}><Chip estado="neutro" texto={p.categoria} /></div> : null}
                 {p.contacto ? <div className="mini" style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}><Icono n="mano_obra" s={13} />{p.contacto}</div> : null}
-                {p.telefono ? <div className="mini" style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}><Icono n="reloj" s={13} />{p.telefono}</div> : null}
+                {p.telefono ? <div className="mini" style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}><Icono n="telefono" s={13} />{p.telefono}</div> : null}
                 {p.correo ? <div className="mini" style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}><Icono n="info" s={13} />{p.correo}</div> : null}
                 {p.direccion ? <div className="mini" style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}><Icono n="ubicacion" s={13} />{p.direccion}</div> : null}
                 {p.condicionesPago ? <div className="mini" style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}><Icono n="pago" s={13} />{p.condicionesPago}</div> : null}
@@ -3322,7 +3334,7 @@ const SECCIONES = [
 ];
 // En móvil la barra inferior muestra 6 secciones: excluye Ajustes (botón en encabezado)
 // y Proveedores se mantiene (es una sección de uso frecuente en obra).
-const TABS_MOVIL = SECCIONES.filter((s) => s.id !== 'ajustes');
+const TABS_MOVIL = SECCIONES.filter((s) => ['panel','gastos','ordenes','contratos','pagos','proveedores','reportes'].includes(s.id));
 
 function App() {
   const [estado, setEstado] = useState(cargar);
