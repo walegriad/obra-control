@@ -1237,7 +1237,33 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
     FOTOS.listarPorGasto(g.id).then((l) => setVisorFotos(l)).catch(() => setVisorFotos([]));
   };
 
-  const todos = estado.gastos.filter((g) => g.proyectoId === estado.proyectoActivo);
+  const gastosProyecto = estado.gastos.filter((g) => g.proyectoId === estado.proyectoActivo);
+  const mapaContratos = {};
+  (estado.contratos || []).forEach((c) => { mapaContratos[c.id] = c; });
+  const pagosComoGastos = (estado.pagos || [])
+    .filter((p) => p.proyectoId === estado.proyectoActivo)
+    .map((p) => {
+      const contrato = mapaContratos[p.contratoId] || {};
+      const ETQ_PAGO = { anticipo: 'Anticipo', abono: 'Abono', retencion: 'Retención', adelanto: 'Adelanto' };
+      return {
+        id: p.id,
+        proyectoId: p.proyectoId,
+        categoriaId: contrato.categoriaId || '',
+        fecha: p.fecha,
+        descripcion: (ETQ_PAGO[p.tipo] || 'Pago') + ' — ' + (contrato.titulo || 'Contrato'),
+        proveedor: p.trabajador || contrato.proveedor || '',
+        tipo: 'servicio',
+        cantidad: 1,
+        unidad: 'Global',
+        precioUnitario: p.monto,
+        monto: E.r2(p.monto),
+        pagado: true,
+        notas: p.notas || '',
+        numDocumento: p.referencia || '',
+        _esPago: true,
+      };
+    });
+  const todos = gastosProyecto.concat(pagosComoGastos);
   const meses = Array.from(new Set(todos.map((g) => E.mesDe(g.fecha)).filter(Boolean))).sort().reverse();
 
   const lista = todos
@@ -1497,10 +1523,13 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
                     const nFotos = conteoFotos[g.id] || 0;
                     const dias = g.fechaVencimiento ? E.diasHasta(g.fechaVencimiento) : null;
                     return (
-                      <tr key={g.id}>
+                      <tr key={g.id} style={g._esPago ? { opacity: 0.85 } : undefined}>
                         <td className="mono" style={{ fontSize: 13 }}>{fFecha(g.fecha)}</td>
                         <td>
-                          <div style={{ fontWeight: 600 }}>{g.descripcion || 'Sin descripción'}</div>
+                          <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {g._esPago ? <span style={{ fontSize: 10, fontWeight: 700, background: 'var(--menta)', color: '#000', borderRadius: 4, padding: '1px 5px', flexShrink: 0 }}>PAGO</span> : null}
+                            {g.descripcion || 'Sin descripción'}
+                          </div>
                           <div className="mini">{g.proveedor || 'Sin proveedor'} · {(E.TIPOS_GASTO.filter((t) => t.id === g.tipo)[0] || { label: 'Otro' }).label}</div>
                         </td>
                         <td>
@@ -1526,19 +1555,31 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
                           ) : <span className="tenue" style={{ fontSize: 12 }}>—</span>}
                         </td>
                         <td className="cen">
-                          <button className="btn-icono" onClick={() => nFotos ? abrirVisor(g) : abrirEdicion(g)} title={nFotos ? 'Ver ' + nFotos + ' adjunto(s)' : 'Agregar foto o PDF'}>
-                            <Icono n="camara" s={17} c={nFotos ? 'var(--ambar)' : 'var(--texto-3)'} />
-                          </button>
-                          {nFotos > 0 ? <span className="mini mono">{nFotos}</span> : null}
+                          {g._esPago ? <span className="tenue" style={{ fontSize: 12 }}>—</span> : (
+                            <React.Fragment>
+                              <button className="btn-icono" onClick={() => nFotos ? abrirVisor(g) : abrirEdicion(g)} title={nFotos ? 'Ver ' + nFotos + ' adjunto(s)' : 'Agregar foto o PDF'}>
+                                <Icono n="camara" s={17} c={nFotos ? 'var(--ambar)' : 'var(--texto-3)'} />
+                              </button>
+                              {nFotos > 0 ? <span className="mini mono">{nFotos}</span> : null}
+                            </React.Fragment>
+                          )}
                         </td>
                         <td className="cen">
-                          <button className="btn-icono" onClick={() => alternarPago(g)} title={g.pagado ? 'Marcar como pendiente' : 'Marcar como pagado'}>
-                            <Icono n={g.pagado ? 'check' : 'reloj'} s={18} c={g.pagado ? 'var(--menta)' : 'var(--ambar)'} />
-                          </button>
+                          {g._esPago ? (
+                            <Icono n="check" s={18} c="var(--menta)" />
+                          ) : (
+                            <button className="btn-icono" onClick={() => alternarPago(g)} title={g.pagado ? 'Marcar como pendiente' : 'Marcar como pagado'}>
+                              <Icono n={g.pagado ? 'check' : 'reloj'} s={18} c={g.pagado ? 'var(--menta)' : 'var(--ambar)'} />
+                            </button>
+                          )}
                         </td>
                         <td className="der" style={{ whiteSpace: 'nowrap' }}>
-                          <button className="btn-icono" onClick={() => abrirEdicion(g)}><Icono n="lapiz" s={17} /></button>
-                          <button className="btn-icono" onClick={() => borrarGasto(g)}><Icono n="basura" s={17} /></button>
+                          {g._esPago ? <span className="mini tenue">Desde contratos</span> : (
+                            <React.Fragment>
+                              <button className="btn-icono" onClick={() => abrirEdicion(g)}><Icono n="lapiz" s={17} /></button>
+                              <button className="btn-icono" onClick={() => borrarGasto(g)}><Icono n="basura" s={17} /></button>
+                            </React.Fragment>
+                          )}
                         </td>
                       </tr>
                     );
