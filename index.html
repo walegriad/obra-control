@@ -957,7 +957,7 @@ function Panel({ estado, v, alertas, dinero, irA, irAGastosPendientes }) {
 /* ============================================================
    VISTA: PRESUPUESTO
    ============================================================ */
-function Presupuesto({ estado, v, dinero, accion, brindar }) {
+function Presupuesto({ estado, v, dinero, accion, brindar, registrarBorrado }) {
   const [editando, setEditando] = useState(null);
   const cats = estado.categorias.filter((c) => c.proyectoId === estado.proyectoActivo);
   const mapaV = {};
@@ -1149,7 +1149,7 @@ function formGastoVacio(catId) {
   };
 }
 
-function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroInicial }) {
+function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroInicial, registrarBorrado }) {
   const [form, setForm] = useState(null);
   const [fCat, setFCat] = useState('');
   const [fTipo, setFTipo] = useState('');
@@ -1694,7 +1694,7 @@ function licVacia(proyectoId, catId) {
   };
 }
 
-function Ofertas({ estado, dinero, accion, brindar }) {
+function Ofertas({ estado, dinero, accion, brindar, registrarBorrado }) {
   const [form, setForm] = useState(null);
   const [abierta, setAbierta] = useState(null);
   // T1a: combo de proveedor por índice de oferta (cuál dropdown está abierto)
@@ -2379,7 +2379,7 @@ function Reportes({ estado, v, dinero, brindar }) {
 /* ============================================================
    VISTA: ÓRDENES DE COMPRA (solicitud → aprobación → recepción)
    ============================================================ */
-function Ordenes({ estado, dinero, accion, brindar }) {
+function Ordenes({ estado, dinero, accion, brindar, registrarBorrado }) {
   const [form, setForm] = useState(null);
   const [filtroEst, setFiltroEst] = useState('');
 
@@ -2544,7 +2544,7 @@ function Ordenes({ estado, dinero, accion, brindar }) {
 /* ============================================================
    VISTA: CONTRATOS
    ============================================================ */
-function Contratos({ estado, dinero, accion, brindar }) {
+function Contratos({ estado, dinero, accion, brindar, registrarBorrado }) {
   const [form, setForm] = useState(null);
   const contratos = (estado.contratos || []).filter((c) => c.proyectoId === estado.proyectoActivo)
     .sort((a, b) => a.fechaInicio < b.fechaInicio ? 1 : -1);
@@ -2649,7 +2649,7 @@ function Contratos({ estado, dinero, accion, brindar }) {
 /* ============================================================
    VISTA: PAGOS (abonos, adelantos, anticipos)
    ============================================================ */
-function Pagos({ estado, dinero, accion, brindar }) {
+function Pagos({ estado, dinero, accion, brindar, registrarBorrado }) {
   const [form, setForm] = useState(null);
   const [fTipo, setFTipo] = useState('');
   const [fCont, setFCont] = useState('');
@@ -2907,7 +2907,7 @@ function TarjetaProyecto({ f, estado, dinero, setProy, copiarProy, borrarProy, c
   );
 }
 
-function Proyectos({ estado, dinero, accion, brindar, irA }) {
+function Proyectos({ estado, dinero, accion, brindar, irA, registrarBorrado }) {
   const [filtro, setFiltro] = useState('todos');
   const [ubicacion, setUbicacion] = useState('todas');
   const [agrupar, setAgrupar] = useState(false);
@@ -3194,7 +3194,7 @@ function Proyectos({ estado, dinero, accion, brindar, irA }) {
 /* ============================================================
    VISTA: PROVEEDORES
    ============================================================ */
-function Proveedores({ estado, accion, brindar }) {
+function Proveedores({ estado, accion, brindar, registrarBorrado }) {
   const [form, setForm] = useState(null);
   const [buscar, setBuscar] = useState('');
   const provs = (estado.proveedores || [])
@@ -3699,16 +3699,16 @@ function App() {
   }
 
   const contenido = {
-    proyectos: <Proyectos estado={estado} dinero={dinero} accion={accion} brindar={brindar} irA={setVista} />,
+    proyectos: <Proyectos estado={estado} dinero={dinero} accion={accion} brindar={brindar} irA={setVista} registrarBorrado={registrarBorrado} />,
     panel: <Panel estado={estado} v={v} alertas={avisos} dinero={dinero} irA={setVista} irAGastosPendientes={irAGastosPendientes} />,
-    presupuesto: <Presupuesto estado={estado} v={v} dinero={dinero} accion={accion} brindar={brindar} />,
-    gastos: <Gastos estado={estado} dinero={dinero} accion={accion} brindar={brindar} filtroInicial={filtroGastos} limpiarFiltroInicial={() => setFiltroGastos(null)} />,
-    ordenes: <Ordenes estado={estado} dinero={dinero} accion={accion} brindar={brindar} />,
-    contratos: <Contratos estado={estado} dinero={dinero} accion={accion} brindar={brindar} />,
-    pagos: <Pagos estado={estado} dinero={dinero} accion={accion} brindar={brindar} />,
-    proveedores: <Proveedores estado={estado} accion={accion} brindar={brindar} />,
+    presupuesto: <Presupuesto estado={estado} v={v} dinero={dinero} accion={accion} brindar={brindar} registrarBorrado={registrarBorrado} />,
+    gastos: <Gastos estado={estado} dinero={dinero} accion={accion} brindar={brindar} filtroInicial={filtroGastos} limpiarFiltroInicial={() => setFiltroGastos(null)} registrarBorrado={registrarBorrado} />,
+    ordenes: <Ordenes estado={estado} dinero={dinero} accion={accion} brindar={brindar} registrarBorrado={registrarBorrado} />,
+    contratos: <Contratos estado={estado} dinero={dinero} accion={accion} brindar={brindar} registrarBorrado={registrarBorrado} />,
+    pagos: <Pagos estado={estado} dinero={dinero} accion={accion} brindar={brindar} registrarBorrado={registrarBorrado} />,
+    proveedores: <Proveedores estado={estado} accion={accion} brindar={brindar} registrarBorrado={registrarBorrado} />,
     calendario: <CalendarioPagos estado={estado} dinero={dinero} />,
-    ofertas: <Ofertas estado={estado} dinero={dinero} accion={accion} brindar={brindar} />,
+    ofertas: <Ofertas estado={estado} dinero={dinero} accion={accion} brindar={brindar} registrarBorrado={registrarBorrado} />,
     reportes: <Reportes estado={estado} v={v} dinero={dinero} brindar={brindar} />,
     ajustes: <Ajustes estado={estado} accion={accion} brindar={brindar} instalar={instalar} puedeInstalar={!!promptPWA} irA={setVista} />,
   }[vista];
