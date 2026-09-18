@@ -1147,7 +1147,7 @@ function formGastoVacio(catId) {
   return {
     id: E.uid('gs'), categoriaId: catId || '', fecha: E.hoy(), descripcion: '', proveedor: '',
     tipo: 'material', cantidad: '1', unidad: 'unidad', precioUnitario: '', pagado: true, notas: '',
-    numDocumento: '',
+    numDocumento: '', aplicaIR: false, aplicaIVA: false,
     _esNuevo: true,
   };
 }
@@ -1293,7 +1293,10 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
     });
 
   const total = E.r2(lista.reduce((s, g) => s + E.num(g.monto), 0));
-  const previo = E.r2(E.num(form && form.cantidad) * E.num(form && form.precioUnitario));
+  const subtotalForm = E.r2(E.num(form && form.cantidad) * E.num(form && form.precioUnitario));
+  const irForm = (form && form.aplicaIR) ? E.r2(subtotalForm * 0.02) : 0;
+  const ivaForm = (form && form.aplicaIVA) ? E.r2(subtotalForm * 0.15) : 0;
+  const previo = E.r2(subtotalForm - irForm + ivaForm);
 
   const cerrarForm = () => {
     // Si era un gasto nuevo y se cancela sin guardar, las fotos que ya se
@@ -1367,6 +1370,8 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
       cantidad: form.cantidad,
       unidad: form.unidad,
       precioUnitario: form.precioUnitario,
+      aplicaIR: form.aplicaIR || false,
+      aplicaIVA: form.aplicaIVA || false,
       pagado: form.pagado,
       notas: form.notas,
       numDocumento: (form.numDocumento || '').trim(),
@@ -1399,7 +1404,7 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
     setForm({
       ...g, cantidad: String(g.cantidad), precioUnitario: String(g.precioUnitario),
       descripcion: g.descripcion || '', proveedor: g.proveedor || '', notas: g.notas || '',
-      numDocumento: g.numDocumento || '', _esNuevo: false,
+      numDocumento: g.numDocumento || '', aplicaIR: g.aplicaIR === true, aplicaIVA: g.aplicaIVA === true, _esNuevo: false,
     });
   };
 
@@ -1707,15 +1712,31 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
               <input value={form.numDocumento || ''} placeholder="Ej. FAC-001"
                 onChange={(e) => setForm({ ...form, numDocumento: e.target.value })} />
             </Campo>
-            <Campo etq="Monto (C$)">
+            <Campo etq="Monto antes de IVA (C$)">
               <input className="mono" inputMode="decimal" value={form.precioUnitario} placeholder="0.00"
                 onChange={(e) => setForm({ ...form, precioUnitario: e.target.value, cantidad: '1' })} />
             </Campo>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--panel-2)', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
-            <span style={{ fontSize: 12, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--texto-3)', fontWeight: 700 }}>Total</span>
-            <span className="mono" style={{ fontSize: 20, fontWeight: 700, color: 'var(--ambar)' }}>{dinero(previo)}</span>
+          <div style={{ background: 'var(--panel-2)', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                <input type="checkbox" checked={form.aplicaIR || false} onChange={(e) => setForm({ ...form, aplicaIR: e.target.checked })} />
+                Retención IR 2%
+              </label>
+              {form.aplicaIR ? <span className="mono" style={{ fontSize: 13, color: 'var(--rojo)' }}>− {dinero(irForm)}</span> : null}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                <input type="checkbox" checked={form.aplicaIVA || false} onChange={(e) => setForm({ ...form, aplicaIVA: e.target.checked })} />
+                IVA 15%
+              </label>
+              {form.aplicaIVA ? <span className="mono" style={{ fontSize: 13, color: 'var(--texto-2)' }}>+ {dinero(ivaForm)}</span> : null}
+            </div>
+            <div style={{ borderTop: '1px solid var(--borde)', paddingTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 12, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--texto-3)', fontWeight: 700 }}>Total a pagar</span>
+              <span className="mono" style={{ fontSize: 20, fontWeight: 700, color: 'var(--ambar)' }}>{dinero(previo)}</span>
+            </div>
           </div>
 
           <button type="button" onClick={() => setMasDetalles(!masDetalles)}

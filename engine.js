@@ -177,16 +177,24 @@
   function normalizarGasto(g) {
     const cantidad = num(g.cantidad);
     const precioUnitario = r2(g.precioUnitario);
-    const monto = g.montoManual ? r2(g.monto) : r2(cantidad * precioUnitario);
+    var subtotal = g.montoManual ? r2(g.monto) : r2(cantidad * precioUnitario);
+    var aplicaIR = g.aplicaIR === true;
+    var aplicaIVA = g.aplicaIVA === true;
+    var montoIR = aplicaIR ? r2(subtotal * 0.02) : 0;
+    var montoIVA = aplicaIVA ? r2(subtotal * 0.15) : 0;
+    var monto = r2(subtotal - montoIR + montoIVA);
     const pagado = g.pagado !== false;
-    // La fecha de vencimiento solo tiene sentido en facturas al crédito (no pagadas).
-    // Si el gasto está pagado, se descarta para no dejar datos huérfanos.
     const fechaVencimiento = pagado ? '' : (g.fechaVencimiento || '');
     return Object.assign({}, g, {
       id: g.id || uid('gs'),
       fecha: g.fecha || hoy(),
       cantidad,
       precioUnitario,
+      subtotal: subtotal,
+      aplicaIR: aplicaIR,
+      aplicaIVA: aplicaIVA,
+      montoIR: montoIR,
+      montoIVA: montoIVA,
       monto,
       pagado,
       fechaVencimiento,
