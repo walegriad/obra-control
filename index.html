@@ -749,7 +749,7 @@ function Campo({ etq, children }) {
 /* ============================================================
    VISTA: PANEL
    ============================================================ */
-function Panel({ estado, v, alertas, dinero, irA, irAGastosPendientes }) {
+function Panel({ estado, v, alertas, dinero, irA, irAGastosPendientes, irAGasto }) {
   const cats = v.detalle.filter((d) => d.presupuesto > 0 || d.gastado > 0);
   const ultimos = estado.gastos
     .filter((g) => g.proyectoId === estado.proyectoActivo)
@@ -920,7 +920,8 @@ function Panel({ estado, v, alertas, dinero, irA, irAGastosPendientes }) {
         <div className="tarjeta">
           <div className="tarjeta-cab"><h3>Señales del proyecto</h3></div>
           {alertas.map((a, i) => (
-            <div className={'aviso a-' + a.nivel} key={i}>
+            <div className={'aviso a-' + a.nivel} key={i} onClick={() => a.destino && irA(a.destino)}
+              style={{ cursor: a.destino ? 'pointer' : 'default' }}>
               <Icono n={a.nivel === 'ok' ? 'check' : a.nivel === 'info' ? 'info' : 'alerta'} s={17} />
               <span>{a.texto}</span>
             </div>
@@ -936,7 +937,8 @@ function Panel({ estado, v, alertas, dinero, irA, irAGastosPendientes }) {
             <Vacio icono="gastos" titulo="Todavía no hay gastos" texto="Registra el primer movimiento del proyecto." />
           ) : (
             ultimos.map((g) => (
-              <div key={g.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--borde)' }}>
+              <div key={g.id} onClick={() => irAGasto && irAGasto(g.id)}
+                style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--borde)', cursor: 'pointer', borderRadius: 6 }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.descripcion || 'Sin descripción'}</div>
                   <div className="mini">{fFecha(g.fecha)} · {(mapaCat[g.categoriaId] || {}).nombre || 'Sin categoría'}</div>
@@ -1145,11 +1147,12 @@ function formGastoVacio(catId) {
   return {
     id: E.uid('gs'), categoriaId: catId || '', fecha: E.hoy(), descripcion: '', proveedor: '',
     tipo: 'material', cantidad: '1', unidad: 'unidad', precioUnitario: '', pagado: true, notas: '',
+    numDocumento: '',
     _esNuevo: true,
   };
 }
 
-function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroInicial, registrarBorrado }) {
+function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroInicial, registrarBorrado, gastoIdAbrir, limpiarGastoIdAbrir }) {
   const [form, setForm] = useState(null);
   const [fCat, setFCat] = useState('');
   const [fTipo, setFTipo] = useState('');
@@ -1167,6 +1170,7 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
   const [visorFotos, setVisorFotos] = useState([]);
   // T5c: proveedor que se está creando en el panel inline (objeto o null).
   const [nuevoProv, setNuevoProv] = useState(null);
+  const [masDetalles, setMasDetalles] = useState(false);
   // T5c: mostrar/ocultar la lista de sugerencias del combo proveedor.
   const [provAbierto, setProvAbierto] = useState(false);
   // Ref del form: protege el contenido del formulario durante operaciones
@@ -1186,6 +1190,21 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
       if (limpiarFiltroInicial) limpiarFiltroInicial();
     }
   }, [filtroInicial]);
+
+  useEffect(() => {
+    if (gastoIdAbrir) {
+      const g = estado.gastos.find((x) => x.id === gastoIdAbrir);
+      if (g) {
+        setMasDetalles(false);
+        setForm({
+          ...g, cantidad: String(g.cantidad), precioUnitario: String(g.precioUnitario),
+          descripcion: g.descripcion || '', proveedor: g.proveedor || '', notas: g.notas || '',
+          numDocumento: g.numDocumento || '', _esNuevo: false,
+        });
+      }
+      if (limpiarGastoIdAbrir) limpiarGastoIdAbrir();
+    }
+  }, [gastoIdAbrir]);
 
   const cats = estado.categorias.filter((c) => c.proyectoId === estado.proyectoActivo);
   const mapaCat = {};
@@ -1308,8 +1327,7 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
 
   const guardarGasto = () => {
     if (!form.categoriaId) return brindar('Elige una categoría.', 'err');
-    if (!form.descripcion.trim()) return brindar('Describe el gasto.', 'err');
-    if (E.num(form.precioUnitario) <= 0) return brindar('El precio unitario debe ser mayor a cero.', 'err');
+    if (E.num(form.precioUnitario) <= 0) return brindar('El monto debe ser mayor a cero.', 'err');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(form.fecha)) return brindar('La fecha no es válida.', 'err');
 
     const limpio = E.normalizarGasto({
@@ -1325,6 +1343,8 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
       precioUnitario: form.precioUnitario,
       pagado: form.pagado,
       notas: form.notas,
+      numDocumento: (form.numDocumento || '').trim(),
+      fechaVencimiento: form.fechaVencimiento || '',
       creado: form.creado,
     });
     accion((s) => ({
@@ -1348,10 +1368,14 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
     accion((s) => ({ ...s, gastos: s.gastos.map((x) => (x.id === g.id ? { ...x, pagado: !x.pagado } : x)) }));
   };
 
-  const abrirEdicion = (g) => setForm({
-    ...g, cantidad: String(g.cantidad), precioUnitario: String(g.precioUnitario),
-    descripcion: g.descripcion || '', proveedor: g.proveedor || '', notas: g.notas || '', _esNuevo: false,
-  });
+  const abrirEdicion = (g) => {
+    setMasDetalles(false);
+    setForm({
+      ...g, cantidad: String(g.cantidad), precioUnitario: String(g.precioUnitario),
+      descripcion: g.descripcion || '', proveedor: g.proveedor || '', notas: g.notas || '',
+      numDocumento: g.numDocumento || '', _esNuevo: false,
+    });
+  };
 
   // Unidades predefinidas (T4)
   const UNIDADES = ['Unidad', 'm²', 'm³', 'Libras', 'Bolsa', 'Caja', 'Global', 'Jornal', 'qq', 'ml', 'L', 'Otra…'];
@@ -1536,10 +1560,12 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
             <button className="btn" onClick={cerrarForm}>Cancelar</button>
             <button className="btn btn-p" onClick={guardarGasto}><Icono n="check" s={16} />Guardar</button>
           </React.Fragment>}>
-          <Campo etq="Descripción">
-            <input value={form.descripcion} autoFocus placeholder="Ej. Cemento gris 42.5 kg"
-              onChange={(e) => setForm({ ...form, descripcion: e.target.value })} />
+
+          <Campo etq="Monto (C$)">
+            <input className="mono" inputMode="decimal" value={form.precioUnitario} placeholder="0.00" autoFocus
+              onChange={(e) => setForm({ ...form, precioUnitario: e.target.value, cantidad: '1' })} />
           </Campo>
+
           <div className="dos">
             <Campo etq="Categoría">
               <select value={form.categoriaId} onChange={(e) => setForm({ ...form, categoriaId: e.target.value })}>
@@ -1547,197 +1573,208 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
                 {cats.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
               </select>
             </Campo>
-            <Campo etq="Tipo">
-              <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}>
-                {E.TIPOS_GASTO.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
-              </select>
-            </Campo>
-          </div>
-          <div className="dos">
-            <Campo etq="Fecha">
-              <input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
-            </Campo>
-
-            {/* T5c: combo inteligente de proveedor */}
-            <div className="campo" style={{ position: 'relative' }}>
-              <label style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--texto-3)', fontWeight: 700 }}>Proveedor</label>
-              <input
-                value={form.proveedor}
-                placeholder="Escribe para buscar…"
-                autoComplete="off"
-                onFocus={() => setProvAbierto(true)}
-                onBlur={() => setTimeout(() => setProvAbierto(false), 180)}
-                onChange={(e) => { setForm({ ...form, proveedor: e.target.value }); setProvAbierto(true); }}
-                style={{ background: 'var(--fondo-2)', border: '1px solid var(--borde)', borderRadius: 9, padding: '11px 12px', color: 'var(--texto)', width: '100%' }}
-              />
-              {provAbierto && (form.proveedor || '').trim().length > 0 ? (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--panel-2)', border: '1px solid var(--borde-fuerte)', borderRadius: 10, zIndex: 50, marginTop: 4, boxShadow: '0 8px 24px rgba(0,0,0,.4)', overflow: 'hidden' }}>
-                  {provsFiltrados.map((p) => (
-                    <button key={p.id} onMouseDown={() => { setForm((f) => ({ ...f, proveedor: p.nombre })); setProvAbierto(false); }}
-                      style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', color: 'var(--texto)', fontSize: 14 }}>
-                      <div style={{ fontWeight: 600 }}>{p.nombre}</div>
-                      {p.telefono ? <div className="mini">{p.telefono}</div> : null}
-                    </button>
-                  ))}
-                  {/* Botón crear nuevo si no coincide exacto */}
-                  {!proveedores.some((p) => p.nombre.toLowerCase() === (form.proveedor || '').trim().toLowerCase()) ? (
-                    <button onMouseDown={() => { setNuevoProv({ nombre: form.proveedor.trim(), contacto: '', telefono: '', correo: '', direccion: '', notas: '' }); setProvAbierto(false); }}
-                      style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', color: 'var(--ambar)', fontSize: 13.5, borderTop: '1px solid var(--borde)', fontWeight: 600 }}>
-                      <Icono n="mas" s={14} />{' '}Crear proveedor "{form.proveedor.trim()}"
-                    </button>
-                  ) : null}
-                  {provsFiltrados.length === 0 && proveedores.some((p) => p.nombre.toLowerCase() === (form.proveedor || '').trim().toLowerCase()) ? (
-                    <div style={{ padding: '10px 14px', color: 'var(--texto-3)', fontSize: 13 }}>Proveedor ya existe</div>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          {/* Panel de nuevo proveedor — DENTRO del Modal para evitar re-renders externos */}
-          {nuevoProv ? (
-            <div style={{ background: 'var(--panel-2)', border: '1px solid var(--ambar)', borderRadius: 12, padding: 16, marginBottom: 4 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                <h4 style={{ margin: 0, fontFamily: "'Oswald',sans-serif", fontSize: 14, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--ambar)' }}>Nuevo proveedor</h4>
-                <button className="btn-icono" onClick={() => setNuevoProv(null)}><Icono n="equis" s={16} /></button>
-              </div>
-              <Campo etq="Nombre">
-                <input value={nuevoProv.nombre} autoFocus placeholder="Ej. Ferretería Jenny"
-                  onChange={(e) => setNuevoProv({ ...nuevoProv, nombre: e.target.value })} />
-              </Campo>
-              <Campo etq="Nombre del contacto">
-                <input value={nuevoProv.contacto || ''} placeholder="Ej. Juan Pérez"
-                  onChange={(e) => setNuevoProv({ ...nuevoProv, contacto: e.target.value })} />
-              </Campo>
-              <div className="dos">
-                <Campo etq="Teléfono">
-                  <input value={nuevoProv.telefono || ''}
-                    onChange={(e) => setNuevoProv({ ...nuevoProv, telefono: e.target.value })} />
-                </Campo>
-                <Campo etq="Correo">
-                  <input value={nuevoProv.correo || ''}
-                    onChange={(e) => setNuevoProv({ ...nuevoProv, correo: e.target.value })} />
-                </Campo>
-              </div>
-              <Campo etq="Dirección">
-                <input value={nuevoProv.direccion || ''}
-                  onChange={(e) => setNuevoProv({ ...nuevoProv, direccion: e.target.value })} />
-              </Campo>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
-                <button className="btn btn-sm" onClick={() => setNuevoProv(null)}>Cancelar</button>
-                <button className="btn btn-p btn-sm" onClick={() => {
-                  if (!nuevoProv.nombre.trim()) return brindar('El proveedor necesita un nombre.', 'err');
-                  const prov = {
-                    id: E.uid('pv'), nombre: nuevoProv.nombre.trim(),
-                    contacto: nuevoProv.contacto || '', telefono: nuevoProv.telefono || '',
-                    correo: nuevoProv.correo || '', direccion: nuevoProv.direccion || '',
-                    notas: '', creado: new Date().toISOString(),
-                  };
-                  // setForm PRIMERO con el ref (valor más reciente), luego accion
-                  setForm({ ...formRef.current, proveedor: prov.nombre });
-                  setNuevoProv(null);
-                  setProvAbierto(false);
-                  accion((s) => ({ ...s, proveedores: (s.proveedores || []).concat([prov]) }));
-                  brindar('Proveedor creado y seleccionado.', 'ok');
-                }}><Icono n="check" s={14} />Guardar proveedor</button>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="tres">
-            <Campo etq="Cantidad">
-              <input className="mono" inputMode="decimal" value={form.cantidad}
-                onChange={(e) => setForm({ ...form, cantidad: e.target.value })} />
-            </Campo>
-
-            {/* T4: select de unidades con opción "Otra…" */}
-            <div className="campo">
-              <label style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--texto-3)', fontWeight: 700 }}>Unidad</label>
-              <select value={unidadSelect}
-                onChange={(e) => {
-                  if (e.target.value === 'Otra…') setForm({ ...form, unidad: '' });
-                  else setForm({ ...form, unidad: e.target.value });
-                }}
-                style={{ background: 'var(--fondo-2)', border: '1px solid var(--borde)', borderRadius: 9, padding: '11px 12px', color: 'var(--texto)', width: '100%' }}>
-                {UNIDADES.map((u) => <option key={u} value={u}>{u}</option>)}
-              </select>
-              {unidadSelect === 'Otra…' ? (
-                <input value={form.unidad} placeholder="Escribe la unidad…" style={{ marginTop: 6, background: 'var(--fondo-2)', border: '1px solid var(--borde)', borderRadius: 9, padding: '11px 12px', color: 'var(--texto)', width: '100%' }}
-                  onChange={(e) => setForm({ ...form, unidad: e.target.value })} />
-              ) : null}
-            </div>
-
-            <Campo etq="Precio unitario">
-              <input className="mono" inputMode="decimal" value={form.precioUnitario} placeholder="0.00"
-                onChange={(e) => setForm({ ...form, precioUnitario: e.target.value })} />
+            <Campo etq="N.° factura / contrato">
+              <input value={form.numDocumento || ''} placeholder="Ej. FAC-001"
+                onChange={(e) => setForm({ ...form, numDocumento: e.target.value })} />
             </Campo>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--panel-2)', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
-            <span style={{ fontSize: 12, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--texto-3)', fontWeight: 700 }}>Monto</span>
+            <span style={{ fontSize: 12, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--texto-3)', fontWeight: 700 }}>Total</span>
             <span className="mono" style={{ fontSize: 20, fontWeight: 700, color: 'var(--ambar)' }}>{dinero(previo)}</span>
           </div>
 
-          <label className="interruptor" style={{ marginBottom: Boolean(form.pagado) ? 18 : 10 }}>
-            <input type="checkbox" checked={Boolean(form.pagado)}
-              onChange={(e) => setForm({ ...form, pagado: Boolean(e.target.checked), fechaVencimiento: Boolean(e.target.checked) ? '' : (form.fechaVencimiento || '') })} />
-            <span className="pista-sw" />
-            <span>Ya está pagado</span>
-          </label>
+          <button type="button" onClick={() => setMasDetalles(!masDetalles)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'var(--texto-2)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '4px 0', marginBottom: masDetalles ? 10 : 0 }}>
+            <Icono n={masDetalles ? 'abajo' : 'derecha'} s={14} />
+            {masDetalles ? 'Menos detalles' : 'Más detalles'}
+          </button>
 
-          {/* T6b: campo de vencimiento solo si NO está pagado */}
-          {!Boolean(form.pagado) ? (
-            <Campo etq="Vence el (crédito)">
-              <input type="date" value={form.fechaVencimiento || ''}
-                onChange={(e) => setForm({ ...form, fechaVencimiento: e.target.value })} />
-            </Campo>
-          ) : null}
+          {masDetalles ? (
+            <React.Fragment>
+              <Campo etq="Descripción">
+                <input value={form.descripcion} placeholder="Ej. Cemento gris 42.5 kg"
+                  onChange={(e) => setForm({ ...form, descripcion: e.target.value })} />
+              </Campo>
+              <div className="dos">
+                <Campo etq="Tipo">
+                  <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}>
+                    {E.TIPOS_GASTO.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                  </select>
+                </Campo>
+                <Campo etq="Fecha">
+                  <input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
+                </Campo>
+              </div>
 
-          <Campo etq={'Adjuntos (' + fotos.length + '/' + FOTOS.MAX_FOTOS_POR_GASTO + ')'}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 9 }}>
-              {fotos.map((f) => (
-                <div key={f.id} style={{ position: 'relative', width: 68, height: 68, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--borde)' }}>
-                  {f.tipo === 'pdf' ? (
-                    <a href={f.dataURL} target="_blank" rel="noopener noreferrer"
-                      style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--panel-2)', textDecoration: 'none', color: 'var(--rojo)' }}>
-                      <span style={{ fontSize: 22, fontWeight: 700 }}>PDF</span>
-                      <span style={{ fontSize: 9, color: 'var(--texto-3)', maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.nombre || 'documento'}</span>
-                    </a>
-                  ) : (
-                    <img src={f.dataURL} alt="Factura"
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', cursor: 'zoom-in' }}
-                      onClick={() => setFotoAmpliada(f.dataURL)} />
-                  )}
-                  <button onClick={() => quitarFoto(f.id)} title="Quitar adjunto"
-                    style={{ position: 'absolute', top: 2, right: 2, width: 20, height: 20, borderRadius: '50%', background: 'rgba(8,17,19,.85)', display: 'grid', placeItems: 'center' }}>
-                    <Icono n="equis" s={12} c="#fff" />
-                  </button>
+              <div className="campo" style={{ position: 'relative' }}>
+                <label style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--texto-3)', fontWeight: 700 }}>Proveedor</label>
+                <input
+                  value={form.proveedor}
+                  placeholder="Escribe para buscar…"
+                  autoComplete="off"
+                  onFocus={() => setProvAbierto(true)}
+                  onBlur={() => setTimeout(() => setProvAbierto(false), 180)}
+                  onChange={(e) => { setForm({ ...form, proveedor: e.target.value }); setProvAbierto(true); }}
+                  style={{ background: 'var(--fondo-2)', border: '1px solid var(--borde)', borderRadius: 9, padding: '11px 12px', color: 'var(--texto)', width: '100%' }}
+                />
+                {provAbierto && (form.proveedor || '').trim().length > 0 ? (
+                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--panel-2)', border: '1px solid var(--borde-fuerte)', borderRadius: 10, zIndex: 50, marginTop: 4, boxShadow: '0 8px 24px rgba(0,0,0,.4)', overflow: 'hidden' }}>
+                    {provsFiltrados.map((p) => (
+                      <button key={p.id} onMouseDown={() => { setForm((f) => ({ ...f, proveedor: p.nombre })); setProvAbierto(false); }}
+                        style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', color: 'var(--texto)', fontSize: 14 }}>
+                        <div style={{ fontWeight: 600 }}>{p.nombre}</div>
+                        {p.telefono ? <div className="mini">{p.telefono}</div> : null}
+                      </button>
+                    ))}
+                    {!proveedores.some((p) => p.nombre.toLowerCase() === (form.proveedor || '').trim().toLowerCase()) ? (
+                      <button onMouseDown={() => { setNuevoProv({ nombre: form.proveedor.trim(), contacto: '', telefono: '', correo: '', direccion: '', notas: '' }); setProvAbierto(false); }}
+                        style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', color: 'var(--ambar)', fontSize: 13.5, borderTop: '1px solid var(--borde)', fontWeight: 600 }}>
+                        <Icono n="mas" s={14} />{' '}Crear proveedor "{form.proveedor.trim()}"
+                      </button>
+                    ) : null}
+                    {provsFiltrados.length === 0 && proveedores.some((p) => p.nombre.toLowerCase() === (form.proveedor || '').trim().toLowerCase()) ? (
+                      <div style={{ padding: '10px 14px', color: 'var(--texto-3)', fontSize: 13 }}>Proveedor ya existe</div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+
+              {nuevoProv ? (
+                <div style={{ background: 'var(--panel-2)', border: '1px solid var(--ambar)', borderRadius: 12, padding: 16, marginBottom: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                    <h4 style={{ margin: 0, fontFamily: "'Oswald',sans-serif", fontSize: 14, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--ambar)' }}>Nuevo proveedor</h4>
+                    <button className="btn-icono" onClick={() => setNuevoProv(null)}><Icono n="equis" s={16} /></button>
+                  </div>
+                  <Campo etq="Nombre">
+                    <input value={nuevoProv.nombre} autoFocus placeholder="Ej. Ferretería Jenny"
+                      onChange={(e) => setNuevoProv({ ...nuevoProv, nombre: e.target.value })} />
+                  </Campo>
+                  <Campo etq="Nombre del contacto">
+                    <input value={nuevoProv.contacto || ''} placeholder="Ej. Juan Pérez"
+                      onChange={(e) => setNuevoProv({ ...nuevoProv, contacto: e.target.value })} />
+                  </Campo>
+                  <div className="dos">
+                    <Campo etq="Teléfono">
+                      <input value={nuevoProv.telefono || ''}
+                        onChange={(e) => setNuevoProv({ ...nuevoProv, telefono: e.target.value })} />
+                    </Campo>
+                    <Campo etq="Correo">
+                      <input value={nuevoProv.correo || ''}
+                        onChange={(e) => setNuevoProv({ ...nuevoProv, correo: e.target.value })} />
+                    </Campo>
+                  </div>
+                  <Campo etq="Dirección">
+                    <input value={nuevoProv.direccion || ''}
+                      onChange={(e) => setNuevoProv({ ...nuevoProv, direccion: e.target.value })} />
+                  </Campo>
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
+                    <button className="btn btn-sm" onClick={() => setNuevoProv(null)}>Cancelar</button>
+                    <button className="btn btn-p btn-sm" onClick={() => {
+                      if (!nuevoProv.nombre.trim()) return brindar('El proveedor necesita un nombre.', 'err');
+                      const prov = {
+                        id: E.uid('pv'), nombre: nuevoProv.nombre.trim(),
+                        contacto: nuevoProv.contacto || '', telefono: nuevoProv.telefono || '',
+                        correo: nuevoProv.correo || '', direccion: nuevoProv.direccion || '',
+                        notas: '', creado: new Date().toISOString(),
+                      };
+                      setForm({ ...formRef.current, proveedor: prov.nombre });
+                      setNuevoProv(null);
+                      setProvAbierto(false);
+                      accion((s) => ({ ...s, proveedores: (s.proveedores || []).concat([prov]) }));
+                      brindar('Proveedor creado y seleccionado.', 'ok');
+                    }}><Icono n="check" s={14} />Guardar proveedor</button>
+                  </div>
                 </div>
-              ))}
-              {FOTOS.puedeAgregarMas(fotos) ? (
-                <React.Fragment>
-                  <button onClick={() => inputCamara.current && inputCamara.current.click()} disabled={subiendo}
-                    style={{ width: 68, height: 68, borderRadius: 10, border: '1px dashed var(--borde-fuerte)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, color: 'var(--texto-2)' }}>
-                    <Icono n="camara" s={19} /><span style={{ fontSize: 10 }}>Cámara</span>
-                  </button>
-                  <button onClick={() => inputGaleria.current && inputGaleria.current.click()} disabled={subiendo}
-                    style={{ width: 68, height: 68, borderRadius: 10, border: '1px dashed var(--borde-fuerte)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, color: 'var(--texto-2)' }}>
-                    <Icono n="ofertas" s={19} /><span style={{ fontSize: 10 }}>Archivo</span>
-                  </button>
-                </React.Fragment>
               ) : null}
-              {subiendo ? <div style={{ width: 68, height: 68, borderRadius: 10, background: 'var(--panel-2)', display: 'grid', placeItems: 'center' }}><span className="mini">…</span></div> : null}
-            </div>
-            <input ref={inputCamara} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
-              onChange={(e) => { agregarFotos(e.target.files); e.target.value = ''; }} />
-            <input ref={inputGaleria} type="file" accept="image/*,application/pdf" multiple style={{ display: 'none' }}
-              onChange={(e) => { agregarFotos(e.target.files); e.target.value = ''; }} />
-            <div className="mini" style={{ marginTop: 8 }}>Imágenes o PDF. Se guarda en este dispositivo, no se sube a internet.</div>
-          </Campo>
 
-          <Campo etq="Notas (opcional)">
-            <textarea value={form.notas} onChange={(e) => setForm({ ...form, notas: e.target.value })} placeholder="Detalles, número de factura, condiciones…" />
-          </Campo>
+              <div className="tres">
+                <Campo etq="Cantidad">
+                  <input className="mono" inputMode="decimal" value={form.cantidad}
+                    onChange={(e) => setForm({ ...form, cantidad: e.target.value })} />
+                </Campo>
+                <div className="campo">
+                  <label style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--texto-3)', fontWeight: 700 }}>Unidad</label>
+                  <select value={unidadSelect}
+                    onChange={(e) => {
+                      if (e.target.value === 'Otra…') setForm({ ...form, unidad: '' });
+                      else setForm({ ...form, unidad: e.target.value });
+                    }}
+                    style={{ background: 'var(--fondo-2)', border: '1px solid var(--borde)', borderRadius: 9, padding: '11px 12px', color: 'var(--texto)', width: '100%' }}>
+                    {UNIDADES.map((u) => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                  {unidadSelect === 'Otra…' ? (
+                    <input value={form.unidad} placeholder="Escribe la unidad…" style={{ marginTop: 6, background: 'var(--fondo-2)', border: '1px solid var(--borde)', borderRadius: 9, padding: '11px 12px', color: 'var(--texto)', width: '100%' }}
+                      onChange={(e) => setForm({ ...form, unidad: e.target.value })} />
+                  ) : null}
+                </div>
+                <Campo etq="Precio unitario">
+                  <input className="mono" inputMode="decimal" value={form.precioUnitario} placeholder="0.00"
+                    onChange={(e) => setForm({ ...form, precioUnitario: e.target.value })} />
+                </Campo>
+              </div>
+
+              <label className="interruptor" style={{ marginBottom: Boolean(form.pagado) ? 18 : 10 }}>
+                <input type="checkbox" checked={Boolean(form.pagado)}
+                  onChange={(e) => setForm({ ...form, pagado: Boolean(e.target.checked), fechaVencimiento: Boolean(e.target.checked) ? '' : (form.fechaVencimiento || '') })} />
+                <span className="pista-sw" />
+                <span>Ya está pagado</span>
+              </label>
+
+              {!Boolean(form.pagado) ? (
+                <Campo etq="Vence el (crédito)">
+                  <input type="date" value={form.fechaVencimiento || ''}
+                    onChange={(e) => setForm({ ...form, fechaVencimiento: e.target.value })} />
+                </Campo>
+              ) : null}
+
+              <Campo etq={'Adjuntos (' + fotos.length + '/' + FOTOS.MAX_FOTOS_POR_GASTO + ')'}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 9 }}>
+                  {fotos.map((f) => (
+                    <div key={f.id} style={{ position: 'relative', width: 68, height: 68, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--borde)' }}>
+                      {f.tipo === 'pdf' ? (
+                        <a href={f.dataURL} target="_blank" rel="noopener noreferrer"
+                          style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--panel-2)', textDecoration: 'none', color: 'var(--rojo)' }}>
+                          <span style={{ fontSize: 22, fontWeight: 700 }}>PDF</span>
+                          <span style={{ fontSize: 9, color: 'var(--texto-3)', maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.nombre || 'documento'}</span>
+                        </a>
+                      ) : (
+                        <img src={f.dataURL} alt="Factura"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', cursor: 'zoom-in' }}
+                          onClick={() => setFotoAmpliada(f.dataURL)} />
+                      )}
+                      <button onClick={() => quitarFoto(f.id)} title="Quitar adjunto"
+                        style={{ position: 'absolute', top: 2, right: 2, width: 20, height: 20, borderRadius: '50%', background: 'rgba(8,17,19,.85)', display: 'grid', placeItems: 'center' }}>
+                        <Icono n="equis" s={12} c="#fff" />
+                      </button>
+                    </div>
+                  ))}
+                  {FOTOS.puedeAgregarMas(fotos) ? (
+                    <React.Fragment>
+                      <button onClick={() => inputCamara.current && inputCamara.current.click()} disabled={subiendo}
+                        style={{ width: 68, height: 68, borderRadius: 10, border: '1px dashed var(--borde-fuerte)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, color: 'var(--texto-2)' }}>
+                        <Icono n="camara" s={19} /><span style={{ fontSize: 10 }}>Cámara</span>
+                      </button>
+                      <button onClick={() => inputGaleria.current && inputGaleria.current.click()} disabled={subiendo}
+                        style={{ width: 68, height: 68, borderRadius: 10, border: '1px dashed var(--borde-fuerte)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, color: 'var(--texto-2)' }}>
+                        <Icono n="ofertas" s={19} /><span style={{ fontSize: 10 }}>Archivo</span>
+                      </button>
+                    </React.Fragment>
+                  ) : null}
+                  {subiendo ? <div style={{ width: 68, height: 68, borderRadius: 10, background: 'var(--panel-2)', display: 'grid', placeItems: 'center' }}><span className="mini">…</span></div> : null}
+                </div>
+                <input ref={inputCamara} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+                  onChange={(e) => { agregarFotos(e.target.files); e.target.value = ''; }} />
+                <input ref={inputGaleria} type="file" accept="image/*,application/pdf" multiple style={{ display: 'none' }}
+                  onChange={(e) => { agregarFotos(e.target.files); e.target.value = ''; }} />
+                <div className="mini" style={{ marginTop: 8 }}>Imágenes o PDF. Se guarda en este dispositivo, no se sube a internet.</div>
+              </Campo>
+
+              <Campo etq="Notas (opcional)">
+                <textarea value={form.notas} onChange={(e) => setForm({ ...form, notas: e.target.value })} placeholder="Detalles, condiciones…" />
+              </Campo>
+            </React.Fragment>
+          ) : null}
         </Modal>
       ) : null}
     </div>
@@ -2638,12 +2675,13 @@ function Contratos({ estado, dinero, accion, brindar, registrarBorrado }) {
   const CHIP_CONT = { vigente: 'sano', completado: 'neutro', cancelado: 'excedido' };
   const ETQ_CONT = { vigente: 'Vigente', completado: 'Completado', cancelado: 'Cancelado' };
 
-  const abrirNuevo = () => setForm({ id: null, proveedor: '', titulo: '', montoContrato: '', anticipo: '0', retencion: '0', fechaInicio: E.hoy(), fechaFin: '', estado: 'vigente', avance: 0, notas: '' });
+  const cats = estado.categorias.filter((c) => c.proyectoId === estado.proyectoActivo);
+  const abrirNuevo = () => setForm({ id: null, proveedor: '', titulo: '', montoContrato: '', anticipo: '0', retencion: '0', fechaInicio: E.hoy(), fechaFin: '', estado: 'vigente', avance: 0, notas: '', categoriaId: '' });
 
   const guardarContrato = () => {
     if (!form.titulo.trim()) return brindar('El contrato necesita un título.', 'err');
     if (E.num(form.montoContrato) <= 0) return brindar('El monto debe ser mayor a cero.', 'err');
-    const c = E.normalizarContrato({ id: form.id || E.uid('co'), proyectoId: estado.proyectoActivo, proveedor: form.proveedor.trim(), titulo: form.titulo.trim(), montoContrato: form.montoContrato, anticipo: form.anticipo, retencion: form.retencion, fechaInicio: form.fechaInicio, fechaFin: form.fechaFin, estado: form.estado, avance: form.avance, notas: form.notas, creado: form.creado });
+    const c = E.normalizarContrato({ id: form.id || E.uid('co'), proyectoId: estado.proyectoActivo, categoriaId: form.categoriaId || '', proveedor: form.proveedor.trim(), titulo: form.titulo.trim(), montoContrato: form.montoContrato, anticipo: form.anticipo, retencion: form.retencion, fechaInicio: form.fechaInicio, fechaFin: form.fechaFin, estado: form.estado, avance: form.avance, notas: form.notas, creado: form.creado });
     accion((s) => ({ ...s, contratos: form.id ? (s.contratos||[]).map((x) => x.id === form.id ? c : x) : (s.contratos||[]).concat([c]) }));
     brindar(form.id ? 'Contrato actualizado.' : 'Contrato creado.', 'ok');
     setForm(null);
@@ -2681,7 +2719,7 @@ function Contratos({ estado, dinero, accion, brindar, registrarBorrado }) {
                   </div>
                   <div style={{display:'flex',gap:4,alignItems:'center',flexShrink:0}}>
                     <Chip estado={CHIP_CONT[c.estado]} texto={ETQ_CONT[c.estado]} />
-                    <button className="btn-icono" onClick={() => setForm({...c,montoContrato:String(c.montoContrato),anticipo:String(c.anticipo),retencion:String(c.retencion),notas:c.notas||''})}><Icono n="lapiz" s={17} /></button>
+                    <button className="btn-icono" onClick={() => setForm({...c,montoContrato:String(c.montoContrato),anticipo:String(c.anticipo),retencion:String(c.retencion),notas:c.notas||'',categoriaId:c.categoriaId||''})}><Icono n="lapiz" s={17} /></button>
                     <button className="btn-icono" onClick={() => borrarContrato(c)}><Icono n="basura" s={17} /></button>
                   </div>
                 </div>
@@ -2711,8 +2749,14 @@ function Contratos({ estado, dinero, accion, brindar, registrarBorrado }) {
           <Campo etq="Título"><input value={form.titulo} autoFocus placeholder="Ej. Contrato de obra civil" onChange={(e) => setForm({...form,titulo:e.target.value})} /></Campo>
           <div className="dos">
             <Campo etq="Proveedor / Contratista"><input value={form.proveedor} placeholder="Nombre" onChange={(e) => setForm({...form,proveedor:e.target.value})} /></Campo>
-            <Campo etq="Monto del contrato"><input className="mono" inputMode="decimal" value={form.montoContrato} placeholder="0.00" onChange={(e) => setForm({...form,montoContrato:e.target.value})} /></Campo>
+            <Campo etq="Categoría presupuesto">
+              <select value={form.categoriaId || ''} onChange={(e) => setForm({...form,categoriaId:e.target.value})}>
+                <option value="">Sin categoría</option>
+                {cats.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+              </select>
+            </Campo>
           </div>
+          <Campo etq="Monto del contrato"><input className="mono" inputMode="decimal" value={form.montoContrato} placeholder="0.00" onChange={(e) => setForm({...form,montoContrato:e.target.value})} /></Campo>
           <div className="tres">
             <Campo etq="Anticipo (%)"><input className="mono" inputMode="decimal" value={form.anticipo} onChange={(e) => setForm({...form,anticipo:e.target.value})} /></Campo>
             <Campo etq="Retención (%)"><input className="mono" inputMode="decimal" value={form.retencion} onChange={(e) => setForm({...form,retencion:e.target.value})} /></Campo>
@@ -3745,19 +3789,31 @@ function App() {
     setEstado((s) => (s.proyectoActivo === id ? s : { ...s, proyectoActivo: id }));
   };
 
+  const [gastoIdAbrir, setGastoIdAbrir] = useState(null);
+
   const irAGastosPendientes = () => {
     setFiltroGastos('pendientes');
     setVista('gastos');
   };
 
+  const irAGasto = (gastoId) => {
+    setGastoIdAbrir(gastoId);
+    setVista('gastos');
+  };
+
+  const irACategoria = (catId) => {
+    setFiltroGastos(null);
+    setVista('presupuesto');
+  };
+
   const proyecto = estado.proyectos.filter((p) => p.id === estado.proyectoActivo)[0] || null;
   const v = useMemo(
-    () => E.varianzaProyecto(estado.proyectoActivo, estado.categorias, estado.gastos),
-    [estado.proyectoActivo, estado.categorias, estado.gastos]
+    () => E.varianzaProyecto(estado.proyectoActivo, estado.categorias, estado.gastos, estado.contratos, estado.pagos),
+    [estado.proyectoActivo, estado.categorias, estado.gastos, estado.contratos, estado.pagos]
   );
   const avisos = useMemo(
-    () => E.alertas(estado.proyectoActivo, estado.categorias, estado.gastos, estado.licitaciones),
-    [estado.proyectoActivo, estado.categorias, estado.gastos, estado.licitaciones]
+    () => E.alertas(estado.proyectoActivo, estado.categorias, estado.gastos, estado.licitaciones, estado.contratos, estado.pagos),
+    [estado.proyectoActivo, estado.categorias, estado.gastos, estado.licitaciones, estado.contratos, estado.pagos]
   );
 
   const instalar = () => {
@@ -3786,9 +3842,9 @@ function App() {
 
   const contenido = {
     proyectos: <Proyectos estado={estado} dinero={dinero} accion={accion} brindar={brindar} irA={setVista} registrarBorrado={registrarBorrado} />,
-    panel: <Panel estado={estado} v={v} alertas={avisos} dinero={dinero} irA={setVista} irAGastosPendientes={irAGastosPendientes} />,
+    panel: <Panel estado={estado} v={v} alertas={avisos} dinero={dinero} irA={setVista} irAGastosPendientes={irAGastosPendientes} irAGasto={irAGasto} />,
     presupuesto: <Presupuesto estado={estado} v={v} dinero={dinero} accion={accion} brindar={brindar} registrarBorrado={registrarBorrado} />,
-    gastos: <Gastos estado={estado} dinero={dinero} accion={accion} brindar={brindar} filtroInicial={filtroGastos} limpiarFiltroInicial={() => setFiltroGastos(null)} registrarBorrado={registrarBorrado} />,
+    gastos: <Gastos estado={estado} dinero={dinero} accion={accion} brindar={brindar} filtroInicial={filtroGastos} limpiarFiltroInicial={() => setFiltroGastos(null)} registrarBorrado={registrarBorrado} gastoIdAbrir={gastoIdAbrir} limpiarGastoIdAbrir={() => setGastoIdAbrir(null)} />,
     ordenes: <Ordenes estado={estado} dinero={dinero} accion={accion} brindar={brindar} registrarBorrado={registrarBorrado} />,
     contratos: <Contratos estado={estado} dinero={dinero} accion={accion} brindar={brindar} registrarBorrado={registrarBorrado} />,
     pagos: <Pagos estado={estado} dinero={dinero} accion={accion} brindar={brindar} registrarBorrado={registrarBorrado} />,

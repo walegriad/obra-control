@@ -190,6 +190,7 @@
       monto,
       pagado,
       fechaVencimiento,
+      numDocumento: g.numDocumento || '',
       creado: g.creado || new Date().toISOString(),
       mod: Date.now(),
     });
@@ -244,6 +245,7 @@
     return {
       id: c.id || uid('co'),
       proyectoId: c.proyectoId,
+      categoriaId: c.categoriaId || '',
       proveedor: c.proveedor || '',
       titulo: c.titulo || 'Contrato sin título',
       montoContrato,
@@ -415,35 +417,43 @@
   }
 
   // Varianza de UNA categoría
-  function varianzaCategoria(categoria, gastos) {
-    const propios = gastos.filter((g) => g.categoriaId === categoria.id);
-    const gastado = r2(propios.reduce((s, g) => s + num(g.monto), 0));
-    const pagado = r2(propios.filter((g) => g.pagado).reduce((s, g) => s + num(g.monto), 0));
-    const presupuesto = r2(categoria.presupuesto);
-    const saldo = r2(presupuesto - gastado); // + = ahorro, - = sobrecosto
+  function varianzaCategoria(categoria, gastos, contratos, pagos) {
+    var propios = gastos.filter(function (g) { return g.categoriaId === categoria.id; });
+    var gastadoGastos = r2(propios.reduce(function (s, g) { return s + num(g.monto); }, 0));
+    var pagadoGastos = r2(propios.filter(function (g) { return g.pagado; }).reduce(function (s, g) { return s + num(g.monto); }, 0));
+    var contsCat = (contratos || []).filter(function (c) { return c.categoriaId === categoria.id; });
+    var idsConts = contsCat.map(function (c) { return c.id; });
+    var pagosCat = (pagos || []).filter(function (p) { return idsConts.indexOf(p.contratoId) !== -1; });
+    var montoPagos = r2(pagosCat.reduce(function (s, p) { return s + num(p.monto); }, 0));
+    var gastado = r2(gastadoGastos + montoPagos);
+    var pagado = r2(pagadoGastos + montoPagos);
+    var presupuesto = r2(categoria.presupuesto);
+    var saldo = r2(presupuesto - gastado);
     return {
       categoriaId: categoria.id,
       nombre: categoria.nombre,
       icono: categoria.icono,
       fase: categoria.fase,
-      presupuesto,
-      gastado,
-      pagado,
+      presupuesto: presupuesto,
+      gastado: gastado,
+      pagado: pagado,
       porPagar: r2(gastado - pagado),
-      saldo,
+      saldo: saldo,
       ahorro: saldo > 0 ? saldo : 0,
       sobrecosto: saldo < 0 ? r2(-saldo) : 0,
       ejecucion: pct(gastado, presupuesto),
-      movimientos: propios.length,
+      movimientos: propios.length + pagosCat.length,
       estado: clasificar(presupuesto, gastado),
     };
   }
 
   // Varianza de TODO el proyecto
-  function varianzaProyecto(proyectoId, categorias, gastos) {
+  function varianzaProyecto(proyectoId, categorias, gastos, contratos, pagos) {
     const cats = categorias.filter((c) => c.proyectoId === proyectoId);
     const gs = gastos.filter((g) => g.proyectoId === proyectoId);
-    const detalle = cats.map((c) => varianzaCategoria(c, gs));
+    const conts = (contratos || []).filter((c) => c.proyectoId === proyectoId);
+    const pags = (pagos || []).filter((p) => p.proyectoId === proyectoId);
+    const detalle = cats.map((c) => varianzaCategoria(c, gs, conts, pags));
 
     const presupuesto = r2(detalle.reduce((s, d) => s + d.presupuesto, 0));
     const gastado = r2(detalle.reduce((s, d) => s + d.gastado, 0));
@@ -657,8 +667,8 @@
     return lista;
   }
 
-  function reportePorFase(proyectoId, categorias, gastos) {
-    const v = varianzaProyecto(proyectoId, categorias, gastos);
+  function reportePorFase(proyectoId, categorias, gastos, contratos, pagos) {
+    const v = varianzaProyecto(proyectoId, categorias, gastos, contratos, pagos);
     const fases = {};
     v.detalle.forEach((d) => {
       const f = d.fase || 'Sin fase';
@@ -687,42 +697,42 @@
   }
 
   // Frases de alerta generadas a partir de los números (sin adivinar nada).
-  function alertas(proyectoId, categorias, gastos, licitaciones) {
-    const v = varianzaProyecto(proyectoId, categorias, gastos);
+  function alertas(proyectoId, categorias, gastos, licitaciones, contratos, pagos) {
+    const v = varianzaProyecto(proyectoId, categorias, gastos, contratos, pagos);
     const out = [];
 
     if (v.presupuesto === 0) {
-      out.push({ nivel: 'info', texto: 'Aún no hay presupuesto asignado. Define montos por categoría para activar el control de varianza.' });
+      out.push({ nivel: 'info', texto: 'Aún no hay presupuesto asignado. Define montos por categoría para activar el control de varianza.', destino: 'presupuesto' });
     }
     if (v.sobrecosto > 0) {
-      out.push({ nivel: 'alto', texto: 'El proyecto va ' + v.sobrecosto.toFixed(2) + ' por encima del presupuesto total (' + v.ejecucion + '% ejecutado).' });
+      out.push({ nivel: 'alto', texto: 'El proyecto va ' + v.sobrecosto.toFixed(2) + ' por encima del presupuesto total (' + v.ejecucion + '% ejecutado).', destino: 'presupuesto' });
     }
     v.detalle.filter((d) => d.sobrecosto > 0).forEach((d) => {
-      out.push({ nivel: 'alto', texto: d.nombre + ': sobrecosto de ' + d.sobrecosto.toFixed(2) + ' (' + d.ejecucion + '% del presupuesto).' });
+      out.push({ nivel: 'alto', texto: d.nombre + ': sobrecosto de ' + d.sobrecosto.toFixed(2) + ' (' + d.ejecucion + '% del presupuesto).', destino: 'gastos' });
     });
     v.detalle.filter((d) => d.estado.id === 'alerta').forEach((d) => {
-      out.push({ nivel: 'medio', texto: d.nombre + ' va en ' + d.ejecucion + '%. Quedan ' + d.saldo.toFixed(2) + ' disponibles.' });
+      out.push({ nivel: 'medio', texto: d.nombre + ' va en ' + d.ejecucion + '%. Quedan ' + d.saldo.toFixed(2) + ' disponibles.', destino: 'gastos' });
     });
     if (v.porPagar > 0) {
-      out.push({ nivel: 'medio', texto: 'Hay ' + v.porPagar.toFixed(2) + ' registrados como pendientes de pago.' });
+      out.push({ nivel: 'medio', texto: 'Hay ' + v.porPagar.toFixed(2) + ' registrados como pendientes de pago.', destino: 'gastos' });
     }
     if (v.sinClasificar > 0) {
-      out.push({ nivel: 'medio', texto: 'Hay ' + v.sinClasificar.toFixed(2) + ' en gastos sin categoría asignada.' });
+      out.push({ nivel: 'medio', texto: 'Hay ' + v.sinClasificar.toFixed(2) + ' en gastos sin categoría asignada.', destino: 'gastos' });
     }
 
     (licitaciones || []).filter((l) => l.proyectoId === proyectoId).forEach((l) => {
       const c = compararOfertas(l);
       if (!c.resumen) return;
       if (!l.adjudicadaA && c.resumen.cantidad >= 2) {
-        out.push({ nivel: 'info', texto: '"' + l.titulo + '" tiene ' + c.resumen.cantidad + ' ofertas sin adjudicar. Diferencia entre la más cara y la más barata: ' + c.resumen.rango.toFixed(2) + '.' });
+        out.push({ nivel: 'info', texto: '"' + l.titulo + '" tiene ' + c.resumen.cantidad + ' ofertas sin adjudicar. Diferencia entre la más cara y la más barata: ' + c.resumen.rango.toFixed(2) + '.', destino: 'ofertas' });
       }
       if (c.resumen.sobreprecioAdjudicada > 0) {
-        out.push({ nivel: 'medio', texto: 'En "' + l.titulo + '" se adjudicó una oferta ' + c.resumen.sobreprecioAdjudicada.toFixed(2) + ' más cara que la mínima.' });
+        out.push({ nivel: 'medio', texto: 'En "' + l.titulo + '" se adjudicó una oferta ' + c.resumen.sobreprecioAdjudicada.toFixed(2) + ' más cara que la mínima.', destino: 'ofertas' });
       }
     });
 
     if (out.length === 0) {
-      out.push({ nivel: 'ok', texto: 'Sin desviaciones. Todas las categorías están dentro del presupuesto.' });
+      out.push({ nivel: 'ok', texto: 'Sin desviaciones. Todas las categorías están dentro del presupuesto.', destino: 'presupuesto' });
     }
     return out;
   }
@@ -763,7 +773,7 @@
     );
 
     const filas = proyectos.map((p) => {
-      const v = varianzaProyecto(p.id, estado.categorias, estado.gastos);
+      const v = varianzaProyecto(p.id, estado.categorias, estado.gastos, estado.contratos, estado.pagos);
       const gs = (estado.gastos || []).filter((g) => g.proyectoId === p.id);
       const fechas = gs.map((g) => g.fecha).filter(Boolean).sort();
       const lics = (estado.licitaciones || []).filter((l) => l.proyectoId === p.id);
