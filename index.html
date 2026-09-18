@@ -1162,6 +1162,9 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
   const [soloPendientes, setSoloPendientes] = useState(false);
   // T3: foto abierta en el visor a pantalla completa (dataURL o null).
   const [fotoAmpliada, setFotoAmpliada] = useState(null);
+  // Visor rápido de adjuntos (al hacer clic en el icono de cámara en la tabla)
+  const [visorGasto, setVisorGasto] = useState(null);
+  const [visorFotos, setVisorFotos] = useState([]);
   // T5c: proveedor que se está creando en el panel inline (objeto o null).
   const [nuevoProv, setNuevoProv] = useState(null);
   // T5c: mostrar/ocultar la lista de sugerencias del combo proveedor.
@@ -1203,11 +1206,17 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
 
   // T3: cerrar el visor de foto con la tecla Escape
   useEffect(() => {
-    if (!fotoAmpliada) return;
-    const esc = (e) => { if (e.key === 'Escape') setFotoAmpliada(null); };
+    if (!fotoAmpliada && !visorGasto) return;
+    const esc = (e) => { if (e.key === 'Escape') { setFotoAmpliada(null); setVisorGasto(null); } };
     document.addEventListener('keydown', esc);
     return () => document.removeEventListener('keydown', esc);
-  }, [fotoAmpliada]);
+  }, [fotoAmpliada, visorGasto]);
+
+  const abrirVisor = (g) => {
+    setVisorGasto(g);
+    setVisorFotos([]);
+    FOTOS.listarPorGasto(g.id).then((l) => setVisorFotos(l)).catch(() => setVisorFotos([]));
+  };
 
   const todos = estado.gastos.filter((g) => g.proyectoId === estado.proyectoActivo);
   const meses = Array.from(new Set(todos.map((g) => E.mesDe(g.fecha)).filter(Boolean))).sort().reverse();
@@ -1256,17 +1265,30 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
     try {
       for (const archivo of Array.from(archivos)) {
         if (!FOTOS.puedeAgregarMas(fotos)) {
-          brindar('Ya tienes el máximo de ' + FOTOS.MAX_FOTOS_POR_GASTO + ' fotos en este gasto.', 'err');
+          brindar('Ya tienes el máximo de ' + FOTOS.MAX_FOTOS_POR_GASTO + ' adjuntos en este gasto.', 'err');
           break;
         }
-        if (!/^image\//.test(archivo.type)) {
-          brindar('"' + archivo.name + '" no es una imagen.', 'err');
+        const esPDF = archivo.type === 'application/pdf';
+        const esImagen = /^image\//.test(archivo.type);
+        if (!esImagen && !esPDF) {
+          brindar('"' + archivo.name + '" no es imagen ni PDF.', 'err');
+          continue;
+        }
+        if (esPDF && archivo.size > 10 * 1024 * 1024) {
+          brindar('"' + archivo.name + '" es demasiado grande (máx 10MB).', 'err');
           continue;
         }
         try {
-          const { dataURL, ancho, alto } = await FOTOS.comprimirArchivo(archivo);
-          const registro = await FOTOS.guardar(form.id, dataURL, ancho, alto);
-          setFotos((f) => f.concat([registro]));
+          if (esPDF) {
+            const dataURL = await FOTOS.leerArchivoComoDataURL(archivo);
+            const registro = await FOTOS.guardar(form.id, dataURL, 0, 0, 'pdf');
+            registro.nombre = archivo.name;
+            setFotos((f) => f.concat([registro]));
+          } else {
+            const { dataURL, ancho, alto } = await FOTOS.comprimirArchivo(archivo);
+            const registro = await FOTOS.guardar(form.id, dataURL, ancho, alto, 'image');
+            setFotos((f) => f.concat([registro]));
+          }
         } catch (e) {
           brindar('No se pudo procesar "' + archivo.name + '": ' + e.message, 'err');
         }
@@ -1345,13 +1367,49 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
       {fotoAmpliada ? (
         <div onMouseDown={(e) => { if (e.target === e.currentTarget) setFotoAmpliada(null); }}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.92)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <img src={fotoAmpliada} alt="Factura ampliada"
-            style={{ maxWidth: '90vw', maxHeight: '85vh', borderRadius: 12, boxShadow: '0 8px 40px rgba(0,0,0,.7)', objectFit: 'contain' }} />
+          {typeof fotoAmpliada === 'string' && fotoAmpliada.startsWith('data:application/pdf') ? (
+            <iframe src={fotoAmpliada} title="PDF" style={{ width: '90vw', height: '85vh', borderRadius: 12, border: 'none' }} />
+          ) : (
+            <img src={fotoAmpliada} alt="Factura ampliada"
+              style={{ maxWidth: '90vw', maxHeight: '85vh', borderRadius: 12, boxShadow: '0 8px 40px rgba(0,0,0,.7)', objectFit: 'contain' }} />
+          )}
           <button onClick={() => setFotoAmpliada(null)}
             style={{ position: 'fixed', top: 18, right: 18, width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,.12)', border: '1px solid rgba(255,255,255,.22)', display: 'grid', placeItems: 'center', color: '#fff', fontSize: 20, cursor: 'pointer' }}>
             <Icono n="equis" s={20} c="#fff" />
           </button>
         </div>
+      ) : null}
+
+      {/* Visor rápido de adjuntos (clic en icono cámara de la tabla) */}
+      {visorGasto ? (
+        <Modal titulo={'Adjuntos — ' + (visorGasto.descripcion || 'Gasto')} onCerrar={() => setVisorGasto(null)}
+          pie={<React.Fragment>
+            <button className="btn" onClick={() => setVisorGasto(null)}>Cerrar</button>
+            <button className="btn btn-p" onClick={() => { setVisorGasto(null); abrirEdicion(visorGasto); }}>
+              <Icono n="lapiz" s={16} />Editar gasto
+            </button>
+          </React.Fragment>}>
+          {visorFotos.length === 0 ? (
+            <p className="tenue" style={{ textAlign: 'center', padding: 24 }}>Sin adjuntos</p>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'center' }}>
+              {visorFotos.map((f) => (
+                f.tipo === 'pdf' ? (
+                  <a key={f.id} href={f.dataURL} target="_blank" rel="noopener noreferrer"
+                    style={{ width: 140, height: 140, borderRadius: 12, border: '1px solid var(--borde)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--panel-2)', textDecoration: 'none', color: 'var(--rojo)' }}>
+                    <span style={{ fontSize: 36, fontWeight: 700 }}>PDF</span>
+                    <span style={{ fontSize: 11, color: 'var(--texto-3)', marginTop: 4, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.nombre || 'documento.pdf'}</span>
+                    <span style={{ fontSize: 10, color: 'var(--texto-3)', marginTop: 2 }}>Toca para abrir</span>
+                  </a>
+                ) : (
+                  <img key={f.id} src={f.dataURL} alt="Factura"
+                    onClick={() => setFotoAmpliada(f.dataURL)}
+                    style={{ width: 140, height: 140, objectFit: 'cover', borderRadius: 12, border: '1px solid var(--borde)', cursor: 'zoom-in' }} />
+                )
+              ))}
+            </div>
+          )}
+        </Modal>
       ) : null}
 
       {/* El panel de nuevo proveedor se renderiza DENTRO del Modal del gasto (ver abajo) */}
@@ -1444,7 +1502,7 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
                           ) : <span className="tenue" style={{ fontSize: 12 }}>—</span>}
                         </td>
                         <td className="cen">
-                          <button className="btn-icono" onClick={() => abrirEdicion(g)} title={nFotos ? 'Ver ' + nFotos + ' foto(s)' : 'Agregar foto de factura'}>
+                          <button className="btn-icono" onClick={() => nFotos ? abrirVisor(g) : abrirEdicion(g)} title={nFotos ? 'Ver ' + nFotos + ' adjunto(s)' : 'Agregar foto o PDF'}>
                             <Icono n="camara" s={17} c={nFotos ? 'var(--ambar)' : 'var(--texto-3)'} />
                           </button>
                           {nFotos > 0 ? <span className="mini mono">{nFotos}</span> : null}
@@ -1635,15 +1693,22 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
             </Campo>
           ) : null}
 
-          <Campo etq={'Foto de la factura (' + fotos.length + '/' + FOTOS.MAX_FOTOS_POR_GASTO + ')'}>
+          <Campo etq={'Adjuntos (' + fotos.length + '/' + FOTOS.MAX_FOTOS_POR_GASTO + ')'}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 9 }}>
               {fotos.map((f) => (
                 <div key={f.id} style={{ position: 'relative', width: 68, height: 68, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--borde)' }}>
-                  {/* T3: clic en miniatura abre el visor */}
-                  <img src={f.dataURL} alt="Factura"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', cursor: 'zoom-in' }}
-                    onClick={() => setFotoAmpliada(f.dataURL)} />
-                  <button onClick={() => quitarFoto(f.id)} title="Quitar foto"
+                  {f.tipo === 'pdf' ? (
+                    <a href={f.dataURL} target="_blank" rel="noopener noreferrer"
+                      style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--panel-2)', textDecoration: 'none', color: 'var(--rojo)' }}>
+                      <span style={{ fontSize: 22, fontWeight: 700 }}>PDF</span>
+                      <span style={{ fontSize: 9, color: 'var(--texto-3)', maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.nombre || 'documento'}</span>
+                    </a>
+                  ) : (
+                    <img src={f.dataURL} alt="Factura"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', cursor: 'zoom-in' }}
+                      onClick={() => setFotoAmpliada(f.dataURL)} />
+                  )}
+                  <button onClick={() => quitarFoto(f.id)} title="Quitar adjunto"
                     style={{ position: 'absolute', top: 2, right: 2, width: 20, height: 20, borderRadius: '50%', background: 'rgba(8,17,19,.85)', display: 'grid', placeItems: 'center' }}>
                     <Icono n="equis" s={12} c="#fff" />
                   </button>
@@ -1657,7 +1722,7 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
                   </button>
                   <button onClick={() => inputGaleria.current && inputGaleria.current.click()} disabled={subiendo}
                     style={{ width: 68, height: 68, borderRadius: 10, border: '1px dashed var(--borde-fuerte)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, color: 'var(--texto-2)' }}>
-                    <Icono n="ofertas" s={19} /><span style={{ fontSize: 10 }}>Galería</span>
+                    <Icono n="ofertas" s={19} /><span style={{ fontSize: 10 }}>Archivo</span>
                   </button>
                 </React.Fragment>
               ) : null}
@@ -1665,9 +1730,9 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
             </div>
             <input ref={inputCamara} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
               onChange={(e) => { agregarFotos(e.target.files); e.target.value = ''; }} />
-            <input ref={inputGaleria} type="file" accept="image/*" multiple style={{ display: 'none' }}
+            <input ref={inputGaleria} type="file" accept="image/*,application/pdf" multiple style={{ display: 'none' }}
               onChange={(e) => { agregarFotos(e.target.files); e.target.value = ''; }} />
-            <div className="mini" style={{ marginTop: 8 }}>Se guarda en este dispositivo, comprimida. No se sube a internet.</div>
+            <div className="mini" style={{ marginTop: 8 }}>Imágenes o PDF. Se guarda en este dispositivo, no se sube a internet.</div>
           </Campo>
 
           <Campo etq="Notas (opcional)">
@@ -1754,15 +1819,25 @@ function Ofertas({ estado, dinero, accion, brindar, registrarBorrado }) {
     if (!archivos || archivos.length === 0) return;
     for (const archivo of Array.from(archivos)) {
       if (!FOTOS.puedeAgregarMas(fotasOferta[ofertaId] || [])) {
-        brindar('Máximo ' + FOTOS.MAX_FOTOS_POR_GASTO + ' fotos por oferta.', 'err'); break;
+        brindar('Máximo ' + FOTOS.MAX_FOTOS_POR_GASTO + ' adjuntos por oferta.', 'err'); break;
       }
-      if (!/^image\//.test(archivo.type)) { brindar('"' + archivo.name + '" no es una imagen.', 'err'); continue; }
+      const esPDF = archivo.type === 'application/pdf';
+      const esImagen = /^image\//.test(archivo.type);
+      if (!esImagen && !esPDF) { brindar('"' + archivo.name + '" no es imagen ni PDF.', 'err'); continue; }
+      if (esPDF && archivo.size > 10 * 1024 * 1024) { brindar('"' + archivo.name + '" es demasiado grande (máx 10MB).', 'err'); continue; }
       try {
-        const { dataURL, ancho, alto } = await FOTOS.comprimirArchivo(archivo);
-        const reg = await FOTOS.guardar(ofertaId, dataURL, ancho, alto);
-        setFotasOferta((prev) => ({ ...prev, [ofertaId]: (prev[ofertaId] || []).concat([reg]) }));
+        if (esPDF) {
+          const dataURL = await FOTOS.leerArchivoComoDataURL(archivo);
+          const reg = await FOTOS.guardar(ofertaId, dataURL, 0, 0, 'pdf');
+          reg.nombre = archivo.name;
+          setFotasOferta((prev) => ({ ...prev, [ofertaId]: (prev[ofertaId] || []).concat([reg]) }));
+        } else {
+          const { dataURL, ancho, alto } = await FOTOS.comprimirArchivo(archivo);
+          const reg = await FOTOS.guardar(ofertaId, dataURL, ancho, alto, 'image');
+          setFotasOferta((prev) => ({ ...prev, [ofertaId]: (prev[ofertaId] || []).concat([reg]) }));
+        }
         refrescarConteoFotas();
-      } catch (e) { brindar('No se pudo procesar la imagen: ' + e.message, 'err'); }
+      } catch (e) { brindar('No se pudo procesar el archivo: ' + e.message, 'err'); }
     }
   };
 
@@ -1864,12 +1939,16 @@ function Ofertas({ estado, dinero, accion, brindar, registrarBorrado }) {
 
   return (
     <div>
-      {/* T1b: visor de foto a pantalla completa */}
+      {/* T1b: visor de foto/PDF a pantalla completa */}
       {fotoAmpliada ? (
         <div onMouseDown={(e) => { if (e.target === e.currentTarget) setFotoAmpliada(null); }}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.92)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <img src={fotoAmpliada} alt="Cotización ampliada"
-            style={{ maxWidth: '90vw', maxHeight: '85vh', borderRadius: 12, boxShadow: '0 8px 40px rgba(0,0,0,.7)', objectFit: 'contain' }} />
+          {typeof fotoAmpliada === 'string' && fotoAmpliada.startsWith('data:application/pdf') ? (
+            <iframe src={fotoAmpliada} title="PDF" style={{ width: '90vw', height: '85vh', borderRadius: 12, border: 'none' }} />
+          ) : (
+            <img src={fotoAmpliada} alt="Cotización ampliada"
+              style={{ maxWidth: '90vw', maxHeight: '85vh', borderRadius: 12, boxShadow: '0 8px 40px rgba(0,0,0,.7)', objectFit: 'contain' }} />
+          )}
           <button onClick={() => setFotoAmpliada(null)}
             style={{ position: 'fixed', top: 18, right: 18, width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,.12)', border: '1px solid rgba(255,255,255,.22)', display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
             <Icono n="equis" s={20} c="#fff" />
@@ -2152,13 +2231,20 @@ function Ofertas({ estado, dinero, accion, brindar, registrarBorrado }) {
                 </div>
               ) : null}
 
-              {/* T1b: fotos de la cotización de esta oferta */}
-              <Campo etq={'Foto de cotización (' + (fotasOferta[o.id] || []).length + '/' + FOTOS.MAX_FOTOS_POR_GASTO + ')'}>
+              {/* T1b: fotos/PDF de la cotización de esta oferta */}
+              <Campo etq={'Adjuntos (' + (fotasOferta[o.id] || []).length + '/' + FOTOS.MAX_FOTOS_POR_GASTO + ')'}>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {(fotasOferta[o.id] || []).map((f) => (
                     <div key={f.id} style={{ position: 'relative', width: 60, height: 60, borderRadius: 9, overflow: 'hidden', border: '1px solid var(--borde)' }}>
-                      <img src={f.dataURL} alt="Cotización" style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'zoom-in' }}
-                        onClick={() => setFotoAmpliada(f.dataURL)} />
+                      {f.tipo === 'pdf' ? (
+                        <a href={f.dataURL} target="_blank" rel="noopener noreferrer"
+                          style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--panel-2)', textDecoration: 'none', color: 'var(--rojo)' }}>
+                          <span style={{ fontSize: 18, fontWeight: 700 }}>PDF</span>
+                        </a>
+                      ) : (
+                        <img src={f.dataURL} alt="Cotización" style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'zoom-in' }}
+                          onClick={() => setFotoAmpliada(f.dataURL)} />
+                      )}
                       <button onClick={() => quitarFotoOferta(o.id, f.id)}
                         style={{ position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%', background: 'rgba(8,17,19,.85)', display: 'grid', placeItems: 'center' }}>
                         <Icono n="equis" s={11} c="#fff" />
@@ -2173,7 +2259,7 @@ function Ofertas({ estado, dinero, accion, brindar, registrarBorrado }) {
                       </label>
                       <label style={{ width: 60, height: 60, borderRadius: 9, border: '1px dashed var(--borde-fuerte)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, color: 'var(--texto-2)', cursor: 'pointer' }}>
                         <Icono n="ofertas" s={17} /><span style={{ fontSize: 9 }}>Galería</span>
-                        <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={(e) => { agregarFotoOferta(o.id, e.target.files); e.target.value = ''; }} />
+                        <input type="file" accept="image/*,application/pdf" multiple style={{ display: 'none' }} onChange={(e) => { agregarFotoOferta(o.id, e.target.files); e.target.value = ''; }} />
                       </label>
                     </React.Fragment>
                   ) : null}

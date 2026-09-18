@@ -33,7 +33,7 @@
     return Math.round(b64.length * 0.75);
   }
 
-  function crearRegistro(gastoId, dataURL, ancho, alto) {
+  function crearRegistro(gastoId, dataURL, ancho, alto, tipo) {
     return {
       id: uid(),
       gastoId,
@@ -41,6 +41,7 @@
       ancho: Math.round(ancho) || 0,
       alto: Math.round(alto) || 0,
       bytes: tamanoAprox(dataURL),
+      tipo: tipo || 'image',
       creado: new Date().toISOString(),
     };
   }
@@ -104,9 +105,18 @@
     }));
   }
 
-  function guardar(gastoId, dataURL, ancho, alto) {
-    const registro = crearRegistro(gastoId, dataURL, ancho, alto);
+  function guardar(gastoId, dataURL, ancho, alto, tipo) {
+    const registro = crearRegistro(gastoId, dataURL, ancho, alto, tipo);
     return operacion('readwrite', (almacen) => envolver(almacen.put(registro)).then(() => registro));
+  }
+
+  function leerArchivoComoDataURL(file) {
+    return new Promise((resolve, reject) => {
+      var lector = new FileReader();
+      lector.onerror = () => reject(new Error('No se pudo leer el archivo.'));
+      lector.onload = () => resolve(lector.result);
+      lector.readAsDataURL(file);
+    });
   }
 
   function listarPorGasto(gastoId) {
@@ -182,7 +192,7 @@
     MAX_FOTOS_POR_GASTO, MAX_LADO,
     dimensionesObjetivo, tamanoAprox, crearRegistro, idsHuerfanos, contarPorGasto, puedeAgregarMas, bytesTotales,
     abrir, guardar, listarPorGasto, eliminar, eliminarPorGasto, todas, restaurar, vaciar, limpiarHuerfanas,
-    comprimirArchivo,
+    comprimirArchivo, leerArchivoComoDataURL,
   };
 
   global.FOTOS = FOTOS;
