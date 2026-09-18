@@ -414,12 +414,66 @@ function cargar() {
     if (!crudo) return E.estadoDemo();
     const d = JSON.parse(crudo);
     const base = E.estadoVacio();
-    return Object.assign(base, d);
+    const estado = Object.assign(base, d);
+    if (repararEstado(estado)) guardarLocal(estado);
+    return estado;
   } catch (e) {
     console.error('No se pudo leer el almacenamiento local:', e);
     return E.estadoDemo();
   }
 }
+function repararEstado(estado) {
+  var cambio = false;
+  var campos = ['categorias', 'gastos', 'licitaciones', 'ordenes', 'contratos', 'pagos'];
+  // 1) Fix projects with null/missing IDs
+  estado.proyectos.forEach(function (p) {
+    if (!p.id) {
+      var viejo = p.id;
+      var hash = 0;
+      var nombre = p.nombre || 'proyecto';
+      for (var i = 0; i < nombre.length; i++) hash = ((hash << 5) - hash + nombre.charCodeAt(i)) | 0;
+      p.id = 'pr_fix_' + Math.abs(hash).toString(36);
+      p.mod = Date.now();
+      cambio = true;
+      campos.forEach(function (c) {
+        (estado[c] || []).forEach(function (item) {
+          if (item.proyectoId === viejo || item.proyectoId === 'null' || item.proyectoId === '' || item.proyectoId == null) {
+            item.proyectoId = p.id;
+            item.mod = Date.now();
+          }
+        });
+      });
+      if (estado.proyectoActivo === viejo || estado.proyectoActivo == null) estado.proyectoActivo = p.id;
+    }
+  });
+  // 2) Deduplicate projects by name — keep the first one with a valid ID,
+  //    re-point orphaned entities from duplicates to the survivor.
+  var nombreVisto = {};
+  var idRemap = {};
+  estado.proyectos = estado.proyectos.filter(function (p) {
+    var clave = (p.nombre || '').trim().toLowerCase();
+    if (nombreVisto[clave]) {
+      idRemap[p.id] = nombreVisto[clave];
+      cambio = true;
+      return false;
+    }
+    nombreVisto[clave] = p.id;
+    return true;
+  });
+  if (Object.keys(idRemap).length > 0) {
+    campos.forEach(function (c) {
+      (estado[c] || []).forEach(function (item) {
+        if (idRemap[item.proyectoId]) {
+          item.proyectoId = idRemap[item.proyectoId];
+          item.mod = Date.now();
+        }
+      });
+    });
+    if (idRemap[estado.proyectoActivo]) estado.proyectoActivo = idRemap[estado.proyectoActivo];
+  }
+  return cambio;
+}
+
 function guardarLocal(estado) {
   try {
     localStorage.setItem(CLAVE, JSON.stringify(estado));
@@ -471,19 +525,36 @@ async function supaCargar() {
   }
 }
 
-// Sube el estado actual a Supabase (upsert silencioso).
-// No lanza errores — si falla, el estado sigue en localStorage.
+// Sube el estado tal cual a Supabase (sin fusionar).
+async function supaSubir(estado) {
+  await fetch(
+    SUPA_URL + '/rest/v1/' + SUPA_TABLA,
+    {
+      method: 'POST',
+      headers: supaHeaders,
+      body: JSON.stringify({ id: SUPA_FILA, datos: estado, actualizado: new Date().toISOString() }),
+    }
+  );
+}
+
+// Sube el estado actual a Supabase (upsert con merge).
+// Antes de subir, descarga el estado actual de la nube y fusiona
+// para no pisar cambios hechos por otro dispositivo.
 async function supaGuardar(estado) {
   try {
-    await fetch(
-      SUPA_URL + '/rest/v1/' + SUPA_TABLA,
-      {
-        method: 'POST',
-        headers: supaHeaders,
-        body: JSON.stringify({ id: SUPA_FILA, datos: estado, actualizado: new Date().toISOString() }),
-      }
-    );
+    var nube = await supaCargar();
+    var datos;
+    if (nube && nube.proyectos && nube.proyectos.length > 0) {
+      repararEstado(nube);
+      datos = E.fusionarEstados(estado, nube);
+      repararEstado(datos);
+    } else {
+      datos = estado;
+    }
+    await supaSubir(datos);
+    return datos;
   } catch { /* sin red — ignorar */ }
+  return null;
 }
 
 // Abre una suscripción Realtime de Supabase usando su protocolo
@@ -911,7 +982,7 @@ function Presupuesto({ estado, v, dinero, accion, brindar }) {
       accion((s) => ({
         ...s,
         categorias: s.categorias.map((c) =>
-          c.id === d.id ? { ...c, nombre: d.nombre.trim(), icono: d.icono, fase: d.fase, presupuesto: E.r2(d.presupuesto) } : c
+          c.id === d.id ? { ...c, nombre: d.nombre.trim(), icono: d.icono, fase: d.fase, presupuesto: E.r2(d.presupuesto), mod: Date.now() } : c
         ),
       }));
       brindar('Categoría actualizada.', 'ok');
@@ -920,7 +991,7 @@ function Presupuesto({ estado, v, dinero, accion, brindar }) {
         ...s,
         categorias: s.categorias.concat([{
           id: E.uid('ct'), proyectoId: s.proyectoActivo, nombre: d.nombre.trim(),
-          icono: d.icono, fase: d.fase, presupuesto: E.r2(d.presupuesto),
+          icono: d.icono, fase: d.fase, presupuesto: E.r2(d.presupuesto), mod: Date.now(),
         }]),
       }));
       brindar('Categoría creada.', 'ok');
@@ -936,6 +1007,7 @@ function Presupuesto({ estado, v, dinero, accion, brindar }) {
       msg += '\n\nTiene ' + usados + ' gasto(s) y ' + licit + ' comparativo(s) asociados. Los gastos NO se borran: quedarán como "sin categoría" y seguirán sumando al total.';
     }
     if (!confirm(msg)) return;
+    registrarBorrado(c.id);
     accion((s) => ({ ...s, categorias: s.categorias.filter((x) => x.id !== c.id) }));
     brindar('Categoría eliminada.', 'ok');
   };
@@ -1244,6 +1316,7 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
 
   const borrarGasto = (g) => {
     if (!confirm('¿Borrar el gasto "' + (g.descripcion || 'sin descripción') + '" por ' + dinero(g.monto) + '?\n\nSi tiene fotos de factura, también se borran.')) return;
+    registrarBorrado(g.id);
     accion((s) => ({ ...s, gastos: s.gastos.filter((x) => x.id !== g.id) }));
     FOTOS.eliminarPorGasto(g.id).then(refrescarConteo).catch(() => {});
     brindar('Gasto eliminado.', 'ok');
@@ -1726,6 +1799,7 @@ function Ofertas({ estado, dinero, accion, brindar }) {
       ofertas,
       adjudicadaA: ofertas.some((o) => o.id === form.adjudicadaA) ? form.adjudicadaA : null,
       creado: form.creado || new Date().toISOString(),
+      mod: Date.now(),
     };
     accion((s) => ({
       ...s,
@@ -1740,6 +1814,7 @@ function Ofertas({ estado, dinero, accion, brindar }) {
     if (!confirm('¿Borrar el comparativo "' + l.titulo + '"? Las ofertas y sus fotos se pierden.')) return;
     // T1b: limpiar fotos de todas las ofertas de este comparativo
     (l.ofertas || []).forEach((o) => FOTOS.eliminarPorGasto(o.id).catch(() => {}));
+    registrarBorrado(l.id);
     accion((s) => ({ ...s, licitaciones: s.licitaciones.filter((x) => x.id !== l.id) }));
     brindar('Comparativo eliminado.', 'ok');
   };
@@ -2348,6 +2423,7 @@ function Ordenes({ estado, dinero, accion, brindar }) {
 
   const borrarOrden = (o) => {
     if (!confirm('¿Borrar la orden ' + o.numero + '?')) return;
+    registrarBorrado(o.id);
     accion((s) => ({ ...s, ordenes: (s.ordenes||[]).filter((x) => x.id !== o.id) }));
     brindar('Orden eliminada.', 'ok');
   };
@@ -2489,6 +2565,7 @@ function Contratos({ estado, dinero, accion, brindar }) {
 
   const borrarContrato = (c) => {
     if (!confirm('¿Borrar el contrato "' + c.titulo + '"?')) return;
+    registrarBorrado(c.id);
     accion((s) => ({ ...s, contratos: (s.contratos||[]).filter((x) => x.id !== c.id) }));
     brindar('Contrato eliminado.', 'ok');
   };
@@ -2602,6 +2679,7 @@ function Pagos({ estado, dinero, accion, brindar }) {
 
   const borrarPago = (p) => {
     if (!confirm('¿Borrar este pago?')) return;
+    registrarBorrado(p.id);
     accion((s) => ({ ...s, pagos: (s.pagos||[]).filter((x) => x.id !== p.id) }));
     brindar('Pago eliminado.', 'ok');
   };
@@ -2862,7 +2940,7 @@ function Proyectos({ estado, dinero, accion, brindar, irA }) {
   const guardarProy = () => {
     if (!proy.nombre.trim()) return brindar('El proyecto necesita un nombre.', 'err');
     if (proy.id) {
-      accion((s) => ({ ...s, proyectos: s.proyectos.map((p) => (p.id === proy.id ? { ...p, ...proy, nombre: proy.nombre.trim() } : p)) }));
+      accion((s) => ({ ...s, proyectos: s.proyectos.map((p) => (p.id === proy.id ? { ...p, ...proy, nombre: proy.nombre.trim(), mod: Date.now() } : p)) }));
       brindar('Proyecto actualizado.', 'ok');
     } else {
       const nuevo = E.nuevoProyecto({ ...proy, nombre: proy.nombre.trim() });
@@ -2915,6 +2993,15 @@ function Proyectos({ estado, dinero, accion, brindar, irA }) {
     const gastosDelProyecto = estado.gastos.filter((x) => x.proyectoId === p.id);
     // Borrar fotos de cada gasto del proyecto
     Promise.all(gastosDelProyecto.map((g) => FOTOS.eliminarPorGasto(g.id).catch(() => {}))).catch(() => {});
+    const idsBorrados = [p.id].concat(
+      estado.categorias.filter((x) => x.proyectoId === p.id).map((x) => x.id),
+      gastosDelProyecto.map((x) => x.id),
+      estado.licitaciones.filter((x) => x.proyectoId === p.id).map((x) => x.id),
+      (estado.ordenes||[]).filter((x) => x.proyectoId === p.id).map((x) => x.id),
+      (estado.contratos||[]).filter((x) => x.proyectoId === p.id).map((x) => x.id),
+      (estado.pagos||[]).filter((x) => x.proyectoId === p.id).map((x) => x.id)
+    );
+    registrarBorrado(idsBorrados);
     accion((s) => {
       const proyectos = s.proyectos.filter((x) => x.id !== p.id);
       return {
@@ -2935,7 +3022,7 @@ function Proyectos({ estado, dinero, accion, brindar, irA }) {
   };
 
   const cambiarEstado = (p, nuevo) => {
-    accion((s) => ({ ...s, proyectos: s.proyectos.map((x) => (x.id === p.id ? { ...x, estado: nuevo } : x)) }));
+    accion((s) => ({ ...s, proyectos: s.proyectos.map((x) => (x.id === p.id ? { ...x, estado: nuevo, mod: Date.now() } : x)) }));
   };
 
   return (
@@ -3121,10 +3208,10 @@ function Proveedores({ estado, accion, brindar }) {
     const dupl = (estado.proveedores || []).some((p) => p.id !== form.id && p.nombre.trim().toLowerCase() === form.nombre.trim().toLowerCase());
     if (dupl) return brindar('Ya existe un proveedor con ese nombre.', 'err');
     if (form.id) {
-      accion((s) => ({ ...s, proveedores: (s.proveedores || []).map((p) => p.id === form.id ? { ...p, ...form, nombre: form.nombre.trim() } : p) }));
+      accion((s) => ({ ...s, proveedores: (s.proveedores || []).map((p) => p.id === form.id ? { ...p, ...form, nombre: form.nombre.trim(), mod: Date.now() } : p) }));
       brindar('Proveedor actualizado.', 'ok');
     } else {
-      const nuevo = { id: E.uid('pv'), nombre: form.nombre.trim(), contacto: form.contacto || '', telefono: form.telefono || '', correo: form.correo || '', direccion: form.direccion || '', notas: form.notas || '', calificacion: form.calificacion || 0, categoria: form.categoria || '', condicionesPago: form.condicionesPago || '', creado: new Date().toISOString() };
+      const nuevo = { id: E.uid('pv'), nombre: form.nombre.trim(), contacto: form.contacto || '', telefono: form.telefono || '', correo: form.correo || '', direccion: form.direccion || '', notas: form.notas || '', calificacion: form.calificacion || 0, categoria: form.categoria || '', condicionesPago: form.condicionesPago || '', creado: new Date().toISOString(), mod: Date.now() };
       accion((s) => ({ ...s, proveedores: (s.proveedores || []).concat([nuevo]) }));
       brindar('Proveedor creado.', 'ok');
     }
@@ -3133,6 +3220,7 @@ function Proveedores({ estado, accion, brindar }) {
 
   const borrar = (p) => {
     if (!confirm('¿Borrar el proveedor "' + p.nombre + '"? Si ya está usado en gastos, los gastos conservan el nombre pero ya no estará en la base.')) return;
+    registrarBorrado(p.id);
     accion((s) => ({ ...s, proveedores: (s.proveedores || []).filter((x) => x.id !== p.id) }));
     brindar('Proveedor eliminado.', 'ok');
   };
@@ -3452,9 +3540,15 @@ function App() {
     setSyncEstado('spin');
     supaCargar().then((nube) => {
       if (nube && nube.proyectos && nube.proyectos.length > 0) {
+        repararEstado(nube);
+        const localReparado = Object.assign({}, estadoRef.current);
+        repararEstado(localReparado);
+        const fusionado = E.fusionarEstados(localReparado, nube);
+        repararEstado(fusionado);
         aplicandoRemoto.current = true;
-        setEstado(nube);
-        guardarLocal(nube);
+        setEstado(fusionado);
+        guardarLocal(fusionado);
+        supaSubir(fusionado).catch(() => {});
       } else {
         // No hay nada en la nube todavía (fila nueva o primer dispositivo):
         // subimos el estado local para crear/poblar la fila.
@@ -3494,7 +3588,14 @@ function App() {
     setSyncEstado('spin');
     const timer = setTimeout(() => {
       supaGuardar(estado)
-        .then(() => setSyncEstado('ok'))
+        .then((merged) => {
+          if (merged && merged !== estado) {
+            aplicandoRemoto.current = true;
+            setEstado(merged);
+            guardarLocal(merged);
+          }
+          setSyncEstado('ok');
+        })
         .catch(() => setSyncEstado('err'));
     }, 800);
     return () => clearTimeout(timer);
@@ -3502,23 +3603,15 @@ function App() {
 
   useEffect(() => {
     const desuscribir = supaEscuchar((nuevoEstado) => {
-      // Comparamos TODO el estado sincronizable, no solo "proyectos".
-      // Antes, un cambio en gastos, proveedores o licitaciones no movía
-      // la aguja de "proyectos" y el polling lo ignoraba por completo:
-      // ese dispositivo nunca recibía el cambio, y su próximo guardado
-      // (con datos viejos) terminaba borrando lo que el otro había hecho.
-      const { proyectoActivo: _pa1, ...nubeComparable } = nuevoEstado;
-      const { proyectoActivo: _pa2, ...esteComparable } = estadoRef.current;
-      if (JSON.stringify(nubeComparable) !== JSON.stringify(esteComparable)) {
-        // Preservar el proyecto activo LOCAL — es una preferencia de UI por dispositivo.
-        // Sin esto, el polling de Supabase revertía el cambio de proyecto que el usuario
-        // acaba de hacer al traer el estado anterior de la nube.
-        const estadoNube = Object.assign({}, nuevoEstado, {
-          proyectoActivo: estadoRef.current.proyectoActivo,
-        });
+      repararEstado(nuevoEstado);
+      const fusionado = E.fusionarEstados(estadoRef.current, nuevoEstado);
+      repararEstado(fusionado);
+      const { proyectoActivo: _pa1, _borrados: _b1, ...fusionadoComp } = fusionado;
+      const { proyectoActivo: _pa2, _borrados: _b2, ...localComp } = estadoRef.current;
+      if (JSON.stringify(fusionadoComp) !== JSON.stringify(localComp)) {
         aplicandoRemoto.current = true;
-        setEstado(estadoNube);
-        guardarLocal(estadoNube);
+        setEstado(fusionado);
+        guardarLocal(fusionado);
         setBrindis({ txt: 'Datos actualizados desde otro dispositivo.', tipo: 'ok' });
         fotosReconciliar();
       }
@@ -3555,6 +3648,11 @@ function App() {
   }, [brindis]);
 
   const accion = (fn) => setEstado((s) => fn(s));
+  const registrarBorrado = (ids) => {
+    const ahora = Date.now();
+    const nuevos = (Array.isArray(ids) ? ids : [ids]).map((id) => ({ id, t: ahora }));
+    setEstado((s) => ({ ...s, _borrados: (s._borrados || []).concat(nuevos) }));
+  };
 
   const cambiarProyecto = (id) => {
     if (!id) return;

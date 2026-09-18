@@ -139,6 +139,7 @@
       contratos: [],
       pagos: [],
       fotosNube: [],
+      _borrados: [],
     };
   }
 
@@ -153,6 +154,7 @@
         fin: '',
         estado: 'activo',
         notas: '',
+        mod: Date.now(),
       },
       datos || {}
     );
@@ -166,6 +168,7 @@
       icono: c.icono,
       fase: c.fase,
       presupuesto: 0,
+      mod: Date.now(),
     }));
   }
 
@@ -188,6 +191,7 @@
       pagado,
       fechaVencimiento,
       creado: g.creado || new Date().toISOString(),
+      mod: Date.now(),
     });
   }
 
@@ -226,6 +230,7 @@
       aprobadoPor: o.aprobadoPor || '',
       notas: o.notas || '',
       creado: o.creado || new Date().toISOString(),
+      mod: Date.now(),
     };
   }
 
@@ -250,6 +255,7 @@
       avance: num(c.avance),
       notas: c.notas || '',
       creado: c.creado || new Date().toISOString(),
+      mod: Date.now(),
     };
   }
 
@@ -271,7 +277,48 @@
       descripcion: p.descripcion || '',
       notas: p.notas || '',
       creado: p.creado || new Date().toISOString(),
+      mod: Date.now(),
     };
+  }
+
+  /* ============================================================
+     FUSIÓN DE ESTADOS (SINCRONIZACIÓN MULTI-DISPOSITIVO)
+     Fusiona dos estados (local y nube) combinando arrays por ID.
+     Cada entidad usa su campo `mod` (timestamp) para decidir
+     cuál versión es más reciente. Entidades sin `mod` se tratan
+     como las más antiguas (mod=0).
+     ============================================================ */
+  const CAMPOS_ARRAY = ['proyectos', 'categorias', 'gastos', 'proveedores', 'licitaciones', 'ordenes', 'contratos', 'pagos', 'fotosNube'];
+
+  function fusionarArrays(local, nube) {
+    const mapa = new Map();
+    for (const item of nube) mapa.set(item.id, item);
+    for (const item of local) {
+      const existe = mapa.get(item.id);
+      if (!existe || (item.mod || 0) >= (existe.mod || 0)) mapa.set(item.id, item);
+    }
+    return Array.from(mapa.values());
+  }
+
+  function fusionarEstados(local, nube) {
+    var resultado = Object.assign({}, nube, { proyectoActivo: local.proyectoActivo, moneda: local.moneda });
+    var borradosLocal = local._borrados || [];
+    var borradosNube = nube._borrados || [];
+    var borradosMapa = new Map();
+    borradosLocal.concat(borradosNube).forEach(function (b) {
+      var prev = borradosMapa.get(b.id);
+      if (!prev || b.t > prev.t) borradosMapa.set(b.id, b);
+    });
+    resultado._borrados = Array.from(borradosMapa.values()).filter(function (b) { return Date.now() - b.t < 30 * 86400000; });
+    for (var i = 0; i < CAMPOS_ARRAY.length; i++) {
+      var campo = CAMPOS_ARRAY[i];
+      var fusionado = fusionarArrays(local[campo] || [], nube[campo] || []);
+      resultado[campo] = fusionado.filter(function (item) {
+        var tomb = borradosMapa.get(item.id);
+        return !tomb || (item.mod || 0) > tomb.t;
+      });
+    }
+    return resultado;
   }
 
   function resumenPagosContrato(pagos, contratoId) {
@@ -1015,6 +1062,7 @@
     resumenCartera, clonarProyecto, ubicacionesUsadas, resumenPorUbicacion,
     // nuevos módulos
     resumenPagosContrato, flujoDeCaja, calendarioPagos,
+    fusionarEstados, CAMPOS_ARRAY,
   };
 
   global.ENGINE = ENGINE;
