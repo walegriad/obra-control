@@ -326,7 +326,7 @@
       var fusionado = fusionarArrays(local[campo] || [], nube[campo] || []);
       resultado[campo] = fusionado.filter(function (item) {
         var tomb = borradosMapa.get(item.id);
-        return !tomb || (item.mod || 0) > tomb.t;
+        return !tomb;
       });
     }
     return resultado;
