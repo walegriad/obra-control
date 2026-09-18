@@ -277,6 +277,7 @@
       id: p.id || uid('pg'),
       proyectoId: p.proyectoId,
       contratoId: p.contratoId || '',
+      categoriaId: p.categoriaId || '',
       tipo: p.tipo || 'abono',
       metodo: p.metodo || 'efectivo',
       referencia: p.referencia || '',

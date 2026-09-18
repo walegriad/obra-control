@@ -2865,7 +2865,8 @@ function Pagos({ estado, dinero, accion, brindar, registrarBorrado }) {
   ).sort((a, b) => a.fecha < b.fecha ? 1 : -1);
 
   const total = E.r2(pagos.reduce((s, p) => s + E.num(p.monto), 0));
-  const formVacio = () => ({ id: null, tipo: 'abono', metodo: 'efectivo', referencia: '', monto: '', fecha: E.hoy(), contratoId: '', proveedorId: '', trabajador: '', descripcion: '', notas: '', _esNuevo: true });
+  const cats = (estado.categorias || []).filter((c) => c.proyectoId === estado.proyectoActivo);
+  const formVacio = () => ({ id: null, tipo: 'abono', metodo: 'efectivo', referencia: '', monto: '', fecha: E.hoy(), contratoId: '', categoriaId: '', proveedorId: '', trabajador: '', descripcion: '', notas: '', _esNuevo: true });
 
   const guardarPago = () => {
     if (E.num(form.monto) <= 0) return brindar('El monto debe ser mayor a cero.', 'err');
@@ -2916,7 +2917,7 @@ function Pagos({ estado, dinero, accion, brindar, registrarBorrado }) {
                       <td style={{fontSize:13}}>{etqMetodo(p.metodo)}</td>
                       <td className="der mono" style={{fontWeight:700}}>{dinero(p.monto)}</td>
                       <td className="der" style={{whiteSpace:'nowrap'}}>
-                        <button className="btn-icono" onClick={() => setForm({...p,monto:String(p.monto),contratoId:p.contratoId||'',referencia:p.referencia||'',trabajador:p.trabajador||'',descripcion:p.descripcion||'',notas:p.notas||'',_esNuevo:false})}><Icono n="lapiz" s={17} /></button>
+                        <button className="btn-icono" onClick={() => setForm({...p,monto:String(p.monto),contratoId:p.contratoId||'',categoriaId:p.categoriaId||'',referencia:p.referencia||'',trabajador:p.trabajador||'',descripcion:p.descripcion||'',notas:p.notas||'',_esNuevo:false})}><Icono n="lapiz" s={17} /></button>
                         <button className="btn-icono" onClick={() => borrarPago(p)}><Icono n="basura" s={17} /></button>
                       </td>
                     </tr>
@@ -2944,7 +2945,10 @@ function Pagos({ estado, dinero, accion, brindar, registrarBorrado }) {
             <Campo etq="Fecha"><input type="date" value={form.fecha} onChange={(e) => setForm({...form,fecha:e.target.value})} /></Campo>
           </div>
           <Campo etq="Referencia (N° cheque, transf., etc.)"><input value={form.referencia} placeholder="Opcional" onChange={(e) => setForm({...form,referencia:e.target.value})} /></Campo>
-          <Campo etq="Contrato (abono a)"><select value={form.contratoId} onChange={(e) => setForm({...form,contratoId:e.target.value})}><option value="">Ninguno (pago independiente)</option>{contratosProyecto.map((c) => <option key={c.id} value={c.id}>{c.titulo} — {dinero(c.montoContrato, true)}</option>)}</select></Campo>
+          <div className="dos">
+            <Campo etq="Contrato (abono a)"><select value={form.contratoId} onChange={(e) => setForm({...form,contratoId:e.target.value})}><option value="">Ninguno (pago independiente)</option>{contratosProyecto.map((c) => <option key={c.id} value={c.id}>{c.titulo} — {dinero(c.montoContrato, true)}</option>)}</select></Campo>
+            <Campo etq="Categoría presupuesto"><select value={form.categoriaId || ''} onChange={(e) => setForm({...form,categoriaId:e.target.value})}><option value="">Sin categoría</option>{cats.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select></Campo>
+          </div>
           {form.contratoId && contMap[form.contratoId] ? (() => { const ct = contMap[form.contratoId]; const ab = E.r2((estado.pagos||[]).filter((p) => p.contratoId === form.contratoId && p.id !== form.id).reduce((s,p) => s + E.num(p.monto), 0)); const saldo = E.r2(E.num(ct.montoContrato) - ab); return <div style={{background:'var(--fondo-elev)',borderRadius:8,padding:'10px 14px',marginBottom:14,fontSize:13}}><div className="dos"><div><span className="tenue">Monto contrato: </span><span className="mono" style={{fontWeight:700}}>{dinero(ct.montoContrato, true)}</span></div><div><span className="tenue">Ya abonado: </span><span className="mono">{dinero(ab, true)}</span></div></div><div style={{marginTop:6}}><span className="tenue">Saldo pendiente: </span><span className="mono" style={{fontWeight:700,color: saldo > 0 ? 'var(--rojo)' : 'var(--menta)'}}>{dinero(saldo, true)}</span></div></div>; })() : null}
           <Campo etq="Trabajador (opcional)"><input value={form.trabajador||''} placeholder="Nombre del trabajador" onChange={(e) => setForm({...form,trabajador:e.target.value})} /></Campo>
           <Campo etq="Notas"><textarea value={form.notas||''} onChange={(e) => setForm({...form,notas:e.target.value})} /></Campo>
