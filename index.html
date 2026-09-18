@@ -1293,6 +1293,7 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
     });
 
   const total = E.r2(lista.reduce((s, g) => s + E.num(g.monto), 0));
+  const totalIR = E.r2(gastosProyecto.filter((g) => g.aplicaIR).reduce((s, g) => s + E.num(g.montoIR), 0));
   const subtotalForm = E.r2(E.num(form && form.cantidad) * E.num(form && form.precioUnitario));
   const irForm = (form && form.aplicaIR) ? E.r2(subtotalForm * 0.02) : 0;
   const ivaForm = (form && form.aplicaIVA) ? E.r2(subtotalForm * 0.15) : 0;
@@ -1594,7 +1595,10 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, paddingTop: 14, borderTop: '2px solid var(--borde-fuerte)' }}>
               <span className="mini">{lista.length} movimiento(s) en pantalla</span>
-              <span className="mono" style={{ fontSize: 18, fontWeight: 700 }}>{dinero(total)}</span>
+              <div style={{ textAlign: 'right' }}>
+                <div className="mono" style={{ fontSize: 18, fontWeight: 700 }}>{dinero(total)}</div>
+                {totalIR > 0 ? <div className="mono" style={{ fontSize: 12, color: 'var(--rojo)', marginTop: 2 }}>IR acumulado: {dinero(totalIR)}</div> : null}
+              </div>
             </div>
           </React.Fragment>
         )}
