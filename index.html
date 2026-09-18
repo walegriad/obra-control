@@ -211,6 +211,13 @@ input[type=range]::-moz-range-thumb{width:17px;height:17px;border-radius:50%;bac
 .a-medio{background:rgba(242,169,59,.09);border:1px solid rgba(242,169,59,.22);color:#FFDFA8}
 .a-info{background:rgba(255,255,255,.045);border:1px solid var(--borde);color:var(--texto-2)}
 .a-ok{background:rgba(69,214,166,.09);border:1px solid rgba(69,214,166,.22);color:#A9F0D8}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cal-dia{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 4px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500;transition:background .15s}
+.cal-dia:hover{background:var(--fondo-elev)}
+.cal-dia.hoy{background:var(--ambar-20);font-weight:700;color:var(--ambar)}
+.cal-dia.sel{background:var(--ambar);color:#000;font-weight:700}
+.cal-dia.otro{visibility:hidden}
+.cal-dot{width:6px;height:6px;border-radius:50%;margin-top:4px}
 .filtros{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
 .filtros select,.filtros input{
   background:var(--fondo-2);border:1px solid var(--borde);border-radius:9px;padding:9px 11px;color:var(--texto);font-size:13.5px;
@@ -345,6 +352,11 @@ const TRAZOS = {
   copiar:'M8.5 8.5h12v12h-12z|M15.5 4.5V3.5h-12v12h1',
   camara:'M4 8h3l2-3h6l2 3h3v12H4zM12 18a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
   ubicacion:'M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z|c:12,9,2.5',
+  orden:'M9 2h6v3H9zM5 5h14v17H5zM9 10h6M9 14h4',
+  contrato:'M6 3h12v18H6zM9 7h6M9 10h6M9 13h3M14 17l2-2-2-2',
+  pago:'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM12 6v6l4 2',
+  imprimir:'M6 9V2h12v7M6 18H4v-5h16v5h-2M6 14h12v7H6z',
+  estrella:'M12 2l3 5 6 1-4.5 4 1 6-5.5-3-5.5 3 1-6L3 8l6-1z',
 };
 function Icono({ n, s = 20, c }) {
   const def = TRAZOS[n] || TRAZOS.info;
@@ -700,6 +712,50 @@ function Panel({ estado, v, alertas, dinero, irA, irAGastosPendientes }) {
         <Kpi etq="Por pagar" val={dinero(v.porPagar, true)} pie={v.movimientos + ' movimientos'}
           onClick={irAGastosPendientes} />
       </div>
+
+      {/* KPIs de órdenes y contratos */}
+      {(() => {
+        const ords = (estado.ordenes||[]).filter((o) => o.proyectoId === estado.proyectoActivo);
+        const conts = (estado.contratos||[]).filter((c) => c.proyectoId === estado.proyectoActivo);
+        const pags = (estado.pagos||[]).filter((p) => p.proyectoId === estado.proyectoActivo);
+        const ordPend = ords.filter((o) => o.estado === 'solicitada' || o.estado === 'aprobada').length;
+        const totalContratos = E.r2(conts.reduce((s,c) => s + E.num(c.montoContrato), 0));
+        const totalPagos = E.r2(pags.reduce((s,p) => s + E.num(p.monto), 0));
+        return (ords.length > 0 || conts.length > 0) ? (
+          <div className="rejilla kpis">
+            <Kpi etq="Órdenes activas" val={ordPend} pie={ords.length + ' total'} onClick={() => irA('ordenes')} />
+            <Kpi etq="Contratos" val={conts.length} pie={dinero(totalContratos, true)} onClick={() => irA('contratos')} />
+            <Kpi etq="Pagos realizados" val={pags.length} pie={dinero(totalPagos, true)} tono="menta" onClick={() => irA('pagos')} />
+          </div>
+        ) : null;
+      })()}
+
+      {/* Flujo de caja */}
+      {(() => {
+        const flujo = E.flujoDeCaja(estado.proyectoActivo, estado.gastos, estado.ordenes||[], estado.contratos||[], estado.pagos||[], 3, 3);
+        if (!flujo || flujo.length === 0) return null;
+        const maxSalida = Math.max(...flujo.map((m) => m.salidas), 1);
+        const MESES_CORTO = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+        return (
+          <div className="tarjeta">
+            <div className="tarjeta-cab"><h3>Flujo de caja (6 meses)</h3><button className="btn btn-sm" onClick={() => irA('calendario')}>Calendario</button></div>
+            <div style={{display:'flex',alignItems:'flex-end',gap:6,height:120,marginTop:10}}>
+              {flujo.map((m, i) => {
+                const pct = Math.max(m.salidas / maxSalida * 100, 4);
+                const mesNum = parseInt(m.mes.split('-')[1],10);
+                const esActual = m.mes === E.hoy().slice(0,7);
+                return (
+                  <div key={m.mes} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+                    <span className="mono" style={{fontSize:10,color:'var(--texto-3)'}}>{dinero(m.salidas,true)}</span>
+                    <div style={{width:'100%',height:pct+'%',minHeight:4,borderRadius:'4px 4px 0 0',background: esActual ? 'var(--ambar)' : 'var(--texto-3)',opacity: esActual ? 1 : .4,transition:'height .3s'}} />
+                    <span style={{fontSize:11,fontWeight: esActual ? 700 : 400,color: esActual ? 'var(--ambar)' : 'var(--texto-3)'}}>{MESES_CORTO[mesNum-1]}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="rejilla" style={{ gridTemplateColumns: 'minmax(260px,340px) 1fr' }}>
         <div className="tarjeta">
@@ -2242,6 +2298,466 @@ function Reportes({ estado, v, dinero, brindar }) {
 }
 
 /* ============================================================
+   VISTA: ÓRDENES DE COMPRA (solicitud → aprobación → recepción)
+   ============================================================ */
+function Ordenes({ estado, dinero, accion, brindar }) {
+  const [form, setForm] = useState(null);
+  const [filtroEst, setFiltroEst] = useState('');
+
+  const ordenes = (estado.ordenes || []).filter((o) => o.proyectoId === estado.proyectoActivo
+    && (!filtroEst || o.estado === filtroEst)
+  ).sort((a, b) => a.fechaCreacion < b.fechaCreacion ? 1 : -1);
+
+  const itemVacio = () => ({ descripcion: '', cantidad: 1, unidad: 'unidad', precioUnitario: '', marca: '' });
+  const abrirNueva = () => {
+    const n = (ordenes.length + 1);
+    setForm({ id: null, numero: 'OC-' + String(n).padStart(3, '0'), proveedor: '', estado: 'borrador',
+      items: [itemVacio()], iva: '15', retencionIR: false, fechaCreacion: E.hoy(), fechaEntrega: '',
+      solicitadoPor: '', aprobadoPor: '', notas: '', _esNuevo: true });
+  };
+
+  const totalForm = () => {
+    const sub = E.r2((form.items || []).reduce((s, it) => s + E.r2(E.num(it.cantidad) * E.num(it.precioUnitario)), 0));
+    const imp = E.r2(sub * E.num(form.iva) / 100);
+    const ir = form.retencionIR ? E.r2(sub * 0.02) : 0;
+    return { subtotal: sub, impuesto: imp, retencionIR: ir, total: E.r2(sub + imp - ir) };
+  };
+
+  const guardarOrden = () => {
+    if (!form.proveedor.trim()) return brindar('Indica el proveedor.', 'err');
+    if (form.items.length === 0 || !form.items[0].descripcion.trim()) return brindar('Agrega al menos un ítem.', 'err');
+    const o = E.normalizarOrden({ ...form, proyectoId: estado.proyectoActivo });
+    accion((s) => ({ ...s, ordenes: form._esNuevo ? (s.ordenes||[]).concat([o]) : (s.ordenes||[]).map((x) => x.id === form.id ? o : x) }));
+    brindar(form._esNuevo ? 'Orden creada.' : 'Orden actualizada.', 'ok');
+    setForm(null);
+  };
+
+  const cambiarEstado = (o, nuevoEstado) => {
+    const campos = { estado: nuevoEstado };
+    if (nuevoEstado === 'aprobada') campos.fechaAprobacion = E.hoy();
+    if (nuevoEstado === 'recibida') campos.fechaRecepcion = E.hoy();
+    const actualizada = E.normalizarOrden({ ...o, ...campos });
+    accion((s) => ({ ...s, ordenes: (s.ordenes||[]).map((x) => x.id === o.id ? actualizada : x) }));
+    brindar('Estado actualizado a ' + nuevoEstado + '.', 'ok');
+  };
+
+  const borrarOrden = (o) => {
+    if (!confirm('¿Borrar la orden ' + o.numero + '?')) return;
+    accion((s) => ({ ...s, ordenes: (s.ordenes||[]).filter((x) => x.id !== o.id) }));
+    brindar('Orden eliminada.', 'ok');
+  };
+
+  const CHIP_EST = { borrador: 'sinPresupuesto', solicitada: 'alerta', aprobada: 'sano', recibida: 'neutro', cancelada: 'excedido' };
+  const etqEst = (e) => (E.ESTADOS_ORDEN.find((x) => x.id === e) || { label: e }).label;
+
+  const imprimirOrden = (o) => {
+    const w = window.open('', '_blank');
+    const rows = o.items.map((it, i) => '<tr><td>'+(i+1)+'</td><td>'+it.descripcion+(it.marca?' — '+it.marca:'')+'</td><td class="c">'+it.cantidad+' '+it.unidad+'</td><td class="r">'+dinero(it.precioUnitario)+'</td><td class="r">'+dinero(E.r2(it.cantidad*it.precioUnitario))+'</td></tr>').join('');
+    w.document.write('<!DOCTYPE html><html><head><title>'+o.numero+'</title><style>body{font-family:Arial,sans-serif;padding:30px;color:#222}h1{font-size:18px}table{width:100%;border-collapse:collapse;margin:20px 0}th,td{border:1px solid #ccc;padding:8px;text-align:left;font-size:13px}.c{text-align:center}.r{text-align:right}th{background:#f5f5f5}.tot{font-weight:700}.head{text-align:center;margin-bottom:20px}.head h2{margin:0;font-size:16px}.head p{margin:3px 0;font-size:12px;color:#555}.firma{display:flex;justify-content:space-between;margin-top:60px}.firma div{text-align:center;width:200px;border-top:1px solid #333;padding-top:8px;font-size:12px}@media print{body{padding:15px}}</style></head><body>');
+    w.document.write('<div class="head"><h2>Iglesia Oasis de Amor</h2><p>RUC: J0810000163807</p><p>Km 10 carretera nueva a León contiguo a DIINSA Ciudad Sandino Managua</p><p>Tel. 22691293</p></div>');
+    w.document.write('<h1>Orden de Compra: '+o.numero+'</h1>');
+    w.document.write('<p><b>Proveedor:</b> '+o.proveedor+' | <b>Fecha:</b> '+fFecha(o.fechaCreacion)+' | <b>Estado:</b> '+etqEst(o.estado)+'</p>');
+    w.document.write('<table><thead><tr><th>#</th><th>Descripción</th><th class="c">Cantidad</th><th class="r">P. Unit.</th><th class="r">Total</th></tr></thead><tbody>'+rows+'</tbody></table>');
+    w.document.write('<table style="width:250px;margin-left:auto"><tr><td>Subtotal</td><td class="r">'+dinero(o.subtotal)+'</td></tr><tr><td>IVA ('+o.iva+'%)</td><td class="r">'+dinero(o.impuesto)+'</td></tr>'+(o.retencionIR?'<tr><td>IR 2%</td><td class="r">-'+dinero(o.retencionIR)+'</td></tr>':'')+'<tr class="tot"><td>TOTAL</td><td class="r">'+dinero(o.total)+'</td></tr></table>');
+    if (o.notas) w.document.write('<p><b>Notas:</b> '+o.notas+'</p>');
+    w.document.write('<div class="firma"><div>'+(o.solicitadoPor||'___________')+'<br>Solicitado por</div><div>'+(o.aprobadoPor||'___________')+'<br>Aprobado por</div><div>___________<br>Recibido por</div></div>');
+    w.document.write('</body></html>');
+    w.document.close();
+    w.print();
+  };
+
+  return (
+    <div>
+      <div className="tarjeta">
+        <div className="tarjeta-cab">
+          <h3>Órdenes de compra</h3>
+          <button className="btn btn-p btn-sm" onClick={abrirNueva}><Icono n="mas" s={16} />Nueva orden</button>
+        </div>
+        <div className="filtros">
+          <select value={filtroEst} onChange={(e) => setFiltroEst(e.target.value)}><option value="">Todos los estados</option>{E.ESTADOS_ORDEN.map((e) => <option key={e.id} value={e.id}>{e.label}</option>)}</select>
+        </div>
+        {ordenes.length === 0 ? (
+          <Vacio icono="orden" titulo="Sin órdenes" texto="Crea órdenes de compra para controlar el flujo de solicitud, aprobación y recepción."
+            accion={<button className="btn btn-p" onClick={abrirNueva}><Icono n="mas" s={16} />Nueva orden</button>} />
+        ) : (
+          <div className="tabla-cont">
+            <table>
+              <thead><tr><th style={{width:80}}>N°</th><th>Proveedor</th><th className="cen">Estado</th><th className="cen">Ítems</th><th className="der">Total</th><th className="der">Acciones</th></tr></thead>
+              <tbody>
+                {ordenes.map((o) => (
+                  <tr key={o.id}>
+                    <td className="mono" style={{fontWeight:700}}>{o.numero}</td>
+                    <td><div style={{fontWeight:600}}>{o.proveedor}</div><div className="mini">{fFecha(o.fechaCreacion)}{o.fechaEntrega ? ' · Entrega: '+fFecha(o.fechaEntrega) : ''}</div></td>
+                    <td className="cen"><Chip estado={CHIP_EST[o.estado]||'neutro'} texto={etqEst(o.estado)} /></td>
+                    <td className="cen mono">{o.items.length}</td>
+                    <td className="der mono" style={{fontWeight:700}}>{dinero(o.total)}</td>
+                    <td className="der" style={{whiteSpace:'nowrap'}}>
+                      {o.estado === 'borrador' ? <button className="btn btn-sm" onClick={() => cambiarEstado(o,'solicitada')} title="Solicitar">Solicitar</button> : null}
+                      {o.estado === 'solicitada' ? <button className="btn btn-sm" onClick={() => cambiarEstado(o,'aprobada')} title="Aprobar" style={{color:'var(--menta)'}}>Aprobar</button> : null}
+                      {o.estado === 'aprobada' ? <button className="btn btn-sm" onClick={() => cambiarEstado(o,'recibida')} title="Recibir" style={{color:'var(--menta)'}}>Recibir</button> : null}
+                      <button className="btn-icono" onClick={() => imprimirOrden(o)} title="Imprimir"><Icono n="imprimir" s={17} /></button>
+                      <button className="btn-icono" onClick={() => setForm({...o, iva: String(o.iva), items: o.items.map((it) => ({...it, precioUnitario: String(it.precioUnitario)})), _esNuevo: false})}><Icono n="lapiz" s={17} /></button>
+                      <button className="btn-icono" onClick={() => borrarOrden(o)}><Icono n="basura" s={17} /></button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {form ? (
+        <Modal titulo={form._esNuevo ? 'Nueva orden de compra' : 'Editar orden ' + form.numero} onCerrar={() => setForm(null)}
+          pie={<React.Fragment><button className="btn" onClick={() => setForm(null)}>Cancelar</button><button className="btn btn-p" onClick={guardarOrden}><Icono n="check" s={16} />Guardar</button></React.Fragment>}>
+          <div className="dos">
+            <Campo etq="N° de orden"><input value={form.numero} onChange={(e) => setForm({...form,numero:e.target.value})} /></Campo>
+            <Campo etq="Proveedor"><input value={form.proveedor} autoFocus placeholder="Nombre del proveedor" onChange={(e) => setForm({...form,proveedor:e.target.value})} /></Campo>
+          </div>
+          <div className="dos">
+            <Campo etq="Solicitado por"><input value={form.solicitadoPor} onChange={(e) => setForm({...form,solicitadoPor:e.target.value})} /></Campo>
+            <Campo etq="Fecha entrega"><input type="date" value={form.fechaEntrega||''} onChange={(e) => setForm({...form,fechaEntrega:e.target.value})} /></Campo>
+          </div>
+
+          <h4 style={{margin:'18px 0 10px',fontSize:14}}>Ítems</h4>
+          {form.items.map((it, idx) => (
+            <div key={idx} style={{display:'grid',gridTemplateColumns:'1fr 70px 70px 90px 90px 32px',gap:8,marginBottom:8,alignItems:'end'}}>
+              <Campo etq={idx===0?"Descripción":""}><input value={it.descripcion} placeholder="Descripción" onChange={(e) => { const items=[...form.items]; items[idx]={...it,descripcion:e.target.value}; setForm({...form,items}); }} /></Campo>
+              <Campo etq={idx===0?"Cant.":""}><input className="mono" inputMode="decimal" value={it.cantidad} onChange={(e) => { const items=[...form.items]; items[idx]={...it,cantidad:e.target.value}; setForm({...form,items}); }} /></Campo>
+              <Campo etq={idx===0?"Unidad":""}><input value={it.unidad} onChange={(e) => { const items=[...form.items]; items[idx]={...it,unidad:e.target.value}; setForm({...form,items}); }} /></Campo>
+              <Campo etq={idx===0?"P.Unit.":""}><input className="mono" inputMode="decimal" value={it.precioUnitario} onChange={(e) => { const items=[...form.items]; items[idx]={...it,precioUnitario:e.target.value}; setForm({...form,items}); }} /></Campo>
+              <Campo etq={idx===0?"Marca":""}><input value={it.marca} onChange={(e) => { const items=[...form.items]; items[idx]={...it,marca:e.target.value}; setForm({...form,items}); }} /></Campo>
+              <button className="btn-icono" style={{marginBottom:2}} onClick={() => { const items=form.items.filter((_,i)=>i!==idx); setForm({...form,items:items.length?items:[itemVacio()]}); }}><Icono n="basura" s={15} /></button>
+            </div>
+          ))}
+          <button className="btn btn-sm" onClick={() => setForm({...form,items:form.items.concat([itemVacio()])})}><Icono n="mas" s={14} />Agregar ítem</button>
+
+          <div className="dos" style={{marginTop:14}}>
+            <Campo etq="IVA (%)"><input className="mono" inputMode="decimal" value={form.iva} onChange={(e) => setForm({...form,iva:e.target.value})} /></Campo>
+            <Campo etq="IR 2% retención">
+              <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:14}}>
+                <input type="checkbox" checked={form.retencionIR} onChange={(e) => setForm({...form,retencionIR:e.target.checked})} />
+                Aplicar retención IR 2%
+              </label>
+            </Campo>
+          </div>
+
+          {(() => { const t = totalForm(); return (
+            <div style={{background:'var(--fondo-elev)',borderRadius:8,padding:'12px 16px',marginTop:14,fontSize:13}}>
+              <div style={{display:'flex',justifyContent:'space-between'}}><span className="tenue">Subtotal</span><span className="mono">{dinero(t.subtotal)}</span></div>
+              <div style={{display:'flex',justifyContent:'space-between',marginTop:4}}><span className="tenue">IVA</span><span className="mono">{dinero(t.impuesto)}</span></div>
+              {form.retencionIR ? <div style={{display:'flex',justifyContent:'space-between',marginTop:4}}><span className="tenue">IR 2%</span><span className="mono">-{dinero(t.retencionIR)}</span></div> : null}
+              <div style={{display:'flex',justifyContent:'space-between',marginTop:8,fontWeight:700,fontSize:15}}><span>TOTAL</span><span className="mono">{dinero(t.total)}</span></div>
+            </div>
+          ); })()}
+
+          <Campo etq="Notas"><textarea value={form.notas||''} onChange={(e) => setForm({...form,notas:e.target.value})} /></Campo>
+        </Modal>
+      ) : null}
+    </div>
+  );
+}
+
+/* ============================================================
+   VISTA: CONTRATOS
+   ============================================================ */
+function Contratos({ estado, dinero, accion, brindar }) {
+  const [form, setForm] = useState(null);
+  const contratos = (estado.contratos || []).filter((c) => c.proyectoId === estado.proyectoActivo)
+    .sort((a, b) => a.fechaInicio < b.fechaInicio ? 1 : -1);
+
+  const CHIP_CONT = { vigente: 'sano', completado: 'neutro', cancelado: 'excedido' };
+  const ETQ_CONT = { vigente: 'Vigente', completado: 'Completado', cancelado: 'Cancelado' };
+
+  const abrirNuevo = () => setForm({ id: null, proveedor: '', titulo: '', montoContrato: '', anticipo: '0', retencion: '0', fechaInicio: E.hoy(), fechaFin: '', estado: 'vigente', avance: 0, notas: '' });
+
+  const guardarContrato = () => {
+    if (!form.titulo.trim()) return brindar('El contrato necesita un título.', 'err');
+    if (E.num(form.montoContrato) <= 0) return brindar('El monto debe ser mayor a cero.', 'err');
+    const c = E.normalizarContrato({ id: form.id || E.uid('co'), proyectoId: estado.proyectoActivo, proveedor: form.proveedor.trim(), titulo: form.titulo.trim(), montoContrato: form.montoContrato, anticipo: form.anticipo, retencion: form.retencion, fechaInicio: form.fechaInicio, fechaFin: form.fechaFin, estado: form.estado, avance: form.avance, notas: form.notas, creado: form.creado });
+    accion((s) => ({ ...s, contratos: form.id ? (s.contratos||[]).map((x) => x.id === form.id ? c : x) : (s.contratos||[]).concat([c]) }));
+    brindar(form.id ? 'Contrato actualizado.' : 'Contrato creado.', 'ok');
+    setForm(null);
+  };
+
+  const borrarContrato = (c) => {
+    if (!confirm('¿Borrar el contrato "' + c.titulo + '"?')) return;
+    accion((s) => ({ ...s, contratos: (s.contratos||[]).filter((x) => x.id !== c.id) }));
+    brindar('Contrato eliminado.', 'ok');
+  };
+
+  return (
+    <div>
+      <div className="tarjeta-cab" style={{marginBottom:16}}>
+        <h3 style={{fontSize:18}}>Contratos</h3>
+        <button className="btn btn-p btn-sm" onClick={abrirNuevo}><Icono n="mas" s={16} />Nuevo contrato</button>
+      </div>
+      {contratos.length === 0 ? (
+        <div className="tarjeta"><Vacio icono="contrato" titulo="Sin contratos" texto="Registra contratos para dar seguimiento al avance y retenciones."
+          accion={<button className="btn btn-p" onClick={abrirNuevo}><Icono n="mas" s={16} />Nuevo contrato</button>} /></div>
+      ) : (
+        <div className="rejilla" style={{gridTemplateColumns:'repeat(auto-fill,minmax(340px,1fr))',gap:14}}>
+          {contratos.map((c) => {
+            const montoAnticipo = E.r2(E.num(c.montoContrato) * E.num(c.anticipo) / 100);
+            const montoRetencion = E.r2(E.num(c.montoContrato) * E.num(c.retencion) / 100);
+            const abonado = E.r2((estado.pagos||[]).filter((p) => p.contratoId === c.id).reduce((s,p) => s + E.num(p.monto), 0));
+            const saldoContrato = E.r2(E.num(c.montoContrato) - abonado);
+            return (
+              <div className="tarjeta" key={c.id}>
+                <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'flex-start'}}>
+                  <div style={{minWidth:0}}>
+                    <div style={{fontWeight:700,fontSize:16}}>{c.titulo}</div>
+                    <div className="mini" style={{marginTop:3}}>{c.proveedor || 'Sin proveedor'}</div>
+                  </div>
+                  <div style={{display:'flex',gap:4,alignItems:'center',flexShrink:0}}>
+                    <Chip estado={CHIP_CONT[c.estado]} texto={ETQ_CONT[c.estado]} />
+                    <button className="btn-icono" onClick={() => setForm({...c,montoContrato:String(c.montoContrato),anticipo:String(c.anticipo),retencion:String(c.retencion),notas:c.notas||''})}><Icono n="lapiz" s={17} /></button>
+                    <button className="btn-icono" onClick={() => borrarContrato(c)}><Icono n="basura" s={17} /></button>
+                  </div>
+                </div>
+                <div style={{margin:'14px 0 8px'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:6}}>
+                    <span className="tenue">Avance</span><span className="mono" style={{fontWeight:700}}>{c.avance}%</span>
+                  </div>
+                  <Barra pct={c.avance} estado={c.avance >= 100 ? 'sano' : c.avance >= 75 ? 'alerta' : 'sinPresupuesto'} />
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px 16px',fontSize:13,marginTop:12}}>
+                  <div><span className="tenue">Monto: </span><span className="mono" style={{fontWeight:700}}>{dinero(c.montoContrato, true)}</span></div>
+                  <div><span className="tenue">Anticipo: </span><span className="mono">{dinero(montoAnticipo, true)} ({c.anticipo}%)</span></div>
+                  <div><span className="tenue">Retención: </span><span className="mono">{dinero(montoRetencion, true)} ({c.retencion}%)</span></div>
+                  <div><span className="tenue">Periodo: </span><span className="mono">{fFecha(c.fechaInicio)} — {c.fechaFin ? fFecha(c.fechaFin) : '…'}</span></div>
+                  <div><span className="tenue">Abonado: </span><span className="mono" style={{fontWeight:700,color:'var(--menta)'}}>{dinero(abonado, true)}</span></div>
+                  <div><span className="tenue">Saldo: </span><span className="mono" style={{fontWeight:700,color: saldoContrato > 0 ? 'var(--rojo)' : 'var(--menta)'}}>{dinero(saldoContrato, true)}</span></div>
+                </div>
+                {c.notas ? <div className="mini tenue" style={{marginTop:10}}>{c.notas}</div> : null}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {form ? (
+        <Modal titulo={form.id ? 'Editar contrato' : 'Nuevo contrato'} onCerrar={() => setForm(null)}
+          pie={<React.Fragment><button className="btn" onClick={() => setForm(null)}>Cancelar</button><button className="btn btn-p" onClick={guardarContrato}><Icono n="check" s={16} />Guardar</button></React.Fragment>}>
+          <Campo etq="Título"><input value={form.titulo} autoFocus placeholder="Ej. Contrato de obra civil" onChange={(e) => setForm({...form,titulo:e.target.value})} /></Campo>
+          <div className="dos">
+            <Campo etq="Proveedor / Contratista"><input value={form.proveedor} placeholder="Nombre" onChange={(e) => setForm({...form,proveedor:e.target.value})} /></Campo>
+            <Campo etq="Monto del contrato"><input className="mono" inputMode="decimal" value={form.montoContrato} placeholder="0.00" onChange={(e) => setForm({...form,montoContrato:e.target.value})} /></Campo>
+          </div>
+          <div className="tres">
+            <Campo etq="Anticipo (%)"><input className="mono" inputMode="decimal" value={form.anticipo} onChange={(e) => setForm({...form,anticipo:e.target.value})} /></Campo>
+            <Campo etq="Retención (%)"><input className="mono" inputMode="decimal" value={form.retencion} onChange={(e) => setForm({...form,retencion:e.target.value})} /></Campo>
+            <Campo etq="Estado"><select value={form.estado} onChange={(e) => setForm({...form,estado:e.target.value})}>{Object.keys(ETQ_CONT).map((k) => <option key={k} value={k}>{ETQ_CONT[k]}</option>)}</select></Campo>
+          </div>
+          <div className="dos">
+            <Campo etq="Fecha inicio"><input type="date" value={form.fechaInicio} onChange={(e) => setForm({...form,fechaInicio:e.target.value})} /></Campo>
+            <Campo etq="Fecha fin"><input type="date" value={form.fechaFin||''} onChange={(e) => setForm({...form,fechaFin:e.target.value})} /></Campo>
+          </div>
+          <Campo etq={'Avance (' + form.avance + '%)'}>
+            <input type="range" min="0" max="100" step="5" value={form.avance} onChange={(e) => setForm({...form,avance:Number(e.target.value)})} />
+          </Campo>
+          <Campo etq="Notas"><textarea value={form.notas} onChange={(e) => setForm({...form,notas:e.target.value})} /></Campo>
+        </Modal>
+      ) : null}
+    </div>
+  );
+}
+
+/* ============================================================
+   VISTA: PAGOS (abonos, adelantos, anticipos)
+   ============================================================ */
+function Pagos({ estado, dinero, accion, brindar }) {
+  const [form, setForm] = useState(null);
+  const [fTipo, setFTipo] = useState('');
+  const [fCont, setFCont] = useState('');
+
+  const contratosProyecto = (estado.contratos || []).filter((c) => c.proyectoId === estado.proyectoActivo);
+  const contMap = {};
+  contratosProyecto.forEach((c) => contMap[c.id] = c);
+  const provMap = {};
+  (estado.proveedores||[]).forEach((p) => provMap[p.id] = p.nombre);
+
+  const pagos = (estado.pagos || []).filter((p) => p.proyectoId === estado.proyectoActivo
+    && (!fTipo || p.tipo === fTipo)
+    && (!fCont || p.contratoId === fCont)
+  ).sort((a, b) => a.fecha < b.fecha ? 1 : -1);
+
+  const total = E.r2(pagos.reduce((s, p) => s + E.num(p.monto), 0));
+  const formVacio = () => ({ id: null, tipo: 'abono', metodo: 'efectivo', referencia: '', monto: '', fecha: E.hoy(), contratoId: '', proveedorId: '', trabajador: '', descripcion: '', notas: '', _esNuevo: true });
+
+  const guardarPago = () => {
+    if (E.num(form.monto) <= 0) return brindar('El monto debe ser mayor a cero.', 'err');
+    if (!form.descripcion.trim()) return brindar('Agrega una descripción.', 'err');
+    const p = E.normalizarPago({ ...form, proyectoId: estado.proyectoActivo });
+    accion((s) => ({ ...s, pagos: form._esNuevo ? (s.pagos||[]).concat([p]) : (s.pagos||[]).map((x) => x.id === form.id ? p : x) }));
+    brindar(form._esNuevo ? 'Pago registrado.' : 'Pago actualizado.', 'ok');
+    setForm(null);
+  };
+
+  const borrarPago = (p) => {
+    if (!confirm('¿Borrar este pago?')) return;
+    accion((s) => ({ ...s, pagos: (s.pagos||[]).filter((x) => x.id !== p.id) }));
+    brindar('Pago eliminado.', 'ok');
+  };
+
+  const CHIP_TIPO = { abono: 'sano', adelanto_material: 'alerta', adelanto_mano_obra: 'alerta', anticipo: 'sinPresupuesto', liquidacion: 'neutro' };
+  const etqTipo = (t) => (E.TIPOS_PAGO.find((x) => x.id === t) || { label: t }).label;
+  const etqMetodo = (m) => (E.METODOS_PAGO.find((x) => x.id === m) || { label: m }).label;
+
+  return (
+    <div>
+      <div className="tarjeta">
+        <div className="tarjeta-cab">
+          <h3>Pagos y adelantos</h3>
+          <button className="btn btn-p btn-sm" onClick={() => setForm(formVacio())}><Icono n="mas" s={16} />Registrar pago</button>
+        </div>
+        <div className="filtros">
+          <select value={fTipo} onChange={(e) => setFTipo(e.target.value)}><option value="">Todos los tipos</option>{E.TIPOS_PAGO.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}</select>
+          {contratosProyecto.length > 0 ? <select value={fCont} onChange={(e) => setFCont(e.target.value)}><option value="">Todos los contratos</option>{contratosProyecto.map((c) => <option key={c.id} value={c.id}>{c.titulo}</option>)}</select> : null}
+        </div>
+        {pagos.length === 0 ? (
+          <Vacio icono="pago" titulo="Sin pagos registrados" texto="Registra abonos, adelantos y anticipos a contratos."
+            accion={<button className="btn btn-p" onClick={() => setForm(formVacio())}><Icono n="mas" s={16} />Registrar</button>} />
+        ) : (
+          <React.Fragment>
+            <div className="tabla-cont">
+              <table>
+                <thead><tr><th style={{width:78}}>Fecha</th><th>Descripción</th><th>Contrato</th><th className="cen">Tipo</th><th>Método</th><th className="der">Monto</th><th className="der"></th></tr></thead>
+                <tbody>
+                  {pagos.map((p) => (
+                    <tr key={p.id}>
+                      <td className="mono" style={{fontSize:13}}>{fFecha(p.fecha)}</td>
+                      <td><div style={{fontWeight:600}}>{p.descripcion}</div>{p.referencia ? <div className="mini">Ref: {p.referencia}</div> : null}</td>
+                      <td style={{fontSize:13}}>{contMap[p.contratoId] ? contMap[p.contratoId].titulo : '—'}</td>
+                      <td className="cen"><Chip estado={CHIP_TIPO[p.tipo]||'neutro'} texto={etqTipo(p.tipo)} /></td>
+                      <td style={{fontSize:13}}>{etqMetodo(p.metodo)}</td>
+                      <td className="der mono" style={{fontWeight:700}}>{dinero(p.monto)}</td>
+                      <td className="der" style={{whiteSpace:'nowrap'}}>
+                        <button className="btn-icono" onClick={() => setForm({...p,monto:String(p.monto),contratoId:p.contratoId||'',referencia:p.referencia||'',trabajador:p.trabajador||'',descripcion:p.descripcion||'',notas:p.notas||'',_esNuevo:false})}><Icono n="lapiz" s={17} /></button>
+                        <button className="btn-icono" onClick={() => borrarPago(p)}><Icono n="basura" s={17} /></button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:14,paddingTop:14,borderTop:'2px solid var(--borde-fuerte)'}}>
+              <span className="mini">{pagos.length} pago(s)</span>
+              <span className="mono" style={{fontSize:18,fontWeight:700}}>{dinero(total)}</span>
+            </div>
+          </React.Fragment>
+        )}
+      </div>
+      {form ? (
+        <Modal titulo={form._esNuevo ? 'Registrar pago' : 'Editar pago'} onCerrar={() => setForm(null)}
+          pie={<React.Fragment><button className="btn" onClick={() => setForm(null)}>Cancelar</button><button className="btn btn-p" onClick={guardarPago}><Icono n="check" s={16} />Guardar</button></React.Fragment>}>
+          <Campo etq="Descripción"><input value={form.descripcion} autoFocus placeholder="Ej. Abono materiales semana 3" onChange={(e) => setForm({...form,descripcion:e.target.value})} /></Campo>
+          <div className="dos">
+            <Campo etq="Tipo"><select value={form.tipo} onChange={(e) => setForm({...form,tipo:e.target.value})}>{E.TIPOS_PAGO.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}</select></Campo>
+            <Campo etq="Método"><select value={form.metodo} onChange={(e) => setForm({...form,metodo:e.target.value})}>{E.METODOS_PAGO.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select></Campo>
+          </div>
+          <div className="dos">
+            <Campo etq="Monto"><input className="mono" inputMode="decimal" value={form.monto} placeholder="0.00" onChange={(e) => setForm({...form,monto:e.target.value})} /></Campo>
+            <Campo etq="Fecha"><input type="date" value={form.fecha} onChange={(e) => setForm({...form,fecha:e.target.value})} /></Campo>
+          </div>
+          <Campo etq="Referencia (N° cheque, transf., etc.)"><input value={form.referencia} placeholder="Opcional" onChange={(e) => setForm({...form,referencia:e.target.value})} /></Campo>
+          <Campo etq="Contrato (abono a)"><select value={form.contratoId} onChange={(e) => setForm({...form,contratoId:e.target.value})}><option value="">Ninguno (pago independiente)</option>{contratosProyecto.map((c) => <option key={c.id} value={c.id}>{c.titulo} — {dinero(c.montoContrato, true)}</option>)}</select></Campo>
+          {form.contratoId && contMap[form.contratoId] ? (() => { const ct = contMap[form.contratoId]; const ab = E.r2((estado.pagos||[]).filter((p) => p.contratoId === form.contratoId && p.id !== form.id).reduce((s,p) => s + E.num(p.monto), 0)); const saldo = E.r2(E.num(ct.montoContrato) - ab); return <div style={{background:'var(--fondo-elev)',borderRadius:8,padding:'10px 14px',marginBottom:14,fontSize:13}}><div className="dos"><div><span className="tenue">Monto contrato: </span><span className="mono" style={{fontWeight:700}}>{dinero(ct.montoContrato, true)}</span></div><div><span className="tenue">Ya abonado: </span><span className="mono">{dinero(ab, true)}</span></div></div><div style={{marginTop:6}}><span className="tenue">Saldo pendiente: </span><span className="mono" style={{fontWeight:700,color: saldo > 0 ? 'var(--rojo)' : 'var(--menta)'}}>{dinero(saldo, true)}</span></div></div>; })() : null}
+          <Campo etq="Trabajador (opcional)"><input value={form.trabajador||''} placeholder="Nombre del trabajador" onChange={(e) => setForm({...form,trabajador:e.target.value})} /></Campo>
+          <Campo etq="Notas"><textarea value={form.notas||''} onChange={(e) => setForm({...form,notas:e.target.value})} /></Campo>
+        </Modal>
+      ) : null}
+    </div>
+  );
+}
+
+/* ============================================================
+   VISTA: CALENDARIO DE PAGOS
+   ============================================================ */
+function CalendarioPagos({ estado, dinero }) {
+  const [mesActual, setMesActual] = useState(() => { const h = new Date(); return h.getFullYear() + '-' + String(h.getMonth()+1).padStart(2,'0'); });
+  const [diaSel, setDiaSel] = useState(null);
+
+  const [anio, mes] = mesActual.split('-').map(Number);
+  const primerDia = new Date(anio, mes - 1, 1);
+  const ultimoDia = new Date(anio, mes, 0);
+  const diasEnMes = ultimoDia.getDate();
+  const inicioSemana = primerDia.getDay();
+  const hoyStr = E.hoy();
+  const DIAS_SEM = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const MESES_LARGO = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  const eventos = useMemo(() => E.calendarioPagos(estado.proyectoActivo, estado.gastos, estado.ordenes||[], estado.contratos||[], estado.pagos||[], mesActual), [estado, mesActual]);
+
+  const eventosPorDia = {};
+  eventos.forEach((ev) => { const d = parseInt(ev.fecha.split('-')[2], 10); if (!eventosPorDia[d]) eventosPorDia[d] = []; eventosPorDia[d].push(ev); });
+
+  const mesAnterior = () => { const d = new Date(anio, mes - 2, 1); setMesActual(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0')); setDiaSel(null); };
+  const mesSiguiente = () => { const d = new Date(anio, mes, 1); setMesActual(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0')); setDiaSel(null); };
+
+  const eventosVista = diaSel ? (eventosPorDia[diaSel] || []) : eventos.sort((a,b) => a.fecha < b.fecha ? -1 : 1);
+  const totalVista = E.r2(eventosVista.reduce((s,ev) => s + E.num(ev.monto), 0));
+
+  return (
+    <div className="rejilla" style={{gap:16}}>
+      <div className="tarjeta">
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
+          <button className="btn btn-sm" onClick={mesAnterior}><Icono n="derecha" s={16} c="var(--texto-2)" /></button>
+          <h3 style={{fontSize:18}}>{MESES_LARGO[mes-1]} {anio}</h3>
+          <button className="btn btn-sm" onClick={mesSiguiente}><Icono n="derecha" s={16} /></button>
+        </div>
+        <div className="cal-grid" style={{marginBottom:4}}>
+          {DIAS_SEM.map((d) => <div key={d} style={{textAlign:'center',fontSize:11,fontWeight:700,color:'var(--texto-3)',padding:'6px 0',textTransform:'uppercase',letterSpacing:'.08em'}}>{d}</div>)}
+        </div>
+        <div className="cal-grid">
+          {Array.from({length:inicioSemana}).map((_,i) => <div key={'v'+i} className="cal-dia otro"></div>)}
+          {Array.from({length:diasEnMes}).map((_,i) => {
+            const dia = i + 1;
+            const fechaDia = mesActual + '-' + String(dia).padStart(2,'0');
+            const esHoy = fechaDia === hoyStr;
+            const esSel = dia === diaSel;
+            const tiene = eventosPorDia[dia];
+            const diasH = E.diasHasta(fechaDia);
+            return (
+              <div key={dia} className={'cal-dia' + (esHoy ? ' hoy' : '') + (esSel ? ' sel' : '')} onClick={() => setDiaSel(esSel ? null : dia)}>
+                <span>{dia}</span>
+                {tiene ? <div className="cal-dot" style={{background: diasH < 0 ? 'var(--rojo)' : diasH === 0 ? 'var(--ambar)' : 'var(--texto-3)'}} /> : null}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div className="tarjeta">
+        <div className="tarjeta-cab">
+          <h3>{diaSel ? 'Pagos del ' + diaSel + '/' + String(mes).padStart(2,'0') : 'Pagos del mes'}</h3>
+          {diaSel ? <button className="btn btn-sm" onClick={() => setDiaSel(null)}>Ver todo el mes</button> : null}
+        </div>
+        {eventosVista.length === 0 ? (
+          <Vacio icono="calendario" titulo={diaSel ? 'Sin pagos este día' : 'Sin eventos este mes'} texto="Los pagos aparecen cuando hay gastos, órdenes o abonos con fecha en este mes." />
+        ) : eventosVista.map((ev, i) => (
+          <div key={i} style={{display:'flex',justifyContent:'space-between',gap:12,padding:'11px 0',borderBottom:'1px solid var(--borde)',alignItems:'center'}}>
+            <div style={{display:'flex',gap:10,alignItems:'center',minWidth:0,flex:1}}>
+              <div className="cat-icono" style={{background: ev.tipo==='pago'?'rgba(119,211,164,.15)':ev.tipo==='orden'?'rgba(91,168,242,.15)':undefined, color: ev.tipo==='pago'?'var(--menta)':ev.tipo==='orden'?'var(--azul)':undefined}}>
+                <Icono n={ev.tipo === 'orden' ? 'orden' : ev.tipo === 'pago' ? 'pago' : 'gastos'} s={17} />
+              </div>
+              <div style={{minWidth:0}}>
+                <div style={{fontWeight:600,fontSize:14}}>{ev.desc}</div>
+                <div className="mini">{ev.proveedor ? ev.proveedor + ' · ' : ''}{fFecha(ev.fecha)}</div>
+              </div>
+            </div>
+            <div className="mono" style={{fontWeight:700,fontSize:14,flexShrink:0}}>{dinero(ev.monto, true)}</div>
+          </div>
+        ))}
+        {eventosVista.length > 0 ? (
+          <div style={{display:'flex',justifyContent:'flex-end',marginTop:12,paddingTop:12,borderTop:'2px solid var(--borde-fuerte)'}}>
+            <span className="mono" style={{fontWeight:700,fontSize:16}}>{dinero(totalVista)}</span>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    VISTA: PROYECTOS (cartera)
    ============================================================ */
 const CHIP_PROYECTO = { activo: 'sano', pausado: 'alerta', terminado: 'neutro' };
@@ -2585,7 +3101,7 @@ function Proveedores({ estado, accion, brindar }) {
     .filter((p) => !buscar.trim() || p.nombre.toLowerCase().includes(buscar.toLowerCase()) || (p.telefono || '').includes(buscar) || (p.correo || '').toLowerCase().includes(buscar.toLowerCase()))
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 
-  const vacio = () => ({ id: null, nombre: '', contacto: '', telefono: '', correo: '', direccion: '', notas: '' });
+  const vacio = () => ({ id: null, nombre: '', contacto: '', telefono: '', correo: '', direccion: '', notas: '', calificacion: 0, categoria: '', condicionesPago: '' });
 
   const guardar = () => {
     if (!form.nombre.trim()) return brindar('El proveedor necesita un nombre.', 'err');
@@ -2595,7 +3111,7 @@ function Proveedores({ estado, accion, brindar }) {
       accion((s) => ({ ...s, proveedores: (s.proveedores || []).map((p) => p.id === form.id ? { ...p, ...form, nombre: form.nombre.trim() } : p) }));
       brindar('Proveedor actualizado.', 'ok');
     } else {
-      const nuevo = { id: E.uid('pv'), nombre: form.nombre.trim(), contacto: form.contacto || '', telefono: form.telefono || '', correo: form.correo || '', direccion: form.direccion || '', notas: form.notas || '', creado: new Date().toISOString() };
+      const nuevo = { id: E.uid('pv'), nombre: form.nombre.trim(), contacto: form.contacto || '', telefono: form.telefono || '', correo: form.correo || '', direccion: form.direccion || '', notas: form.notas || '', calificacion: form.calificacion || 0, categoria: form.categoria || '', condicionesPago: form.condicionesPago || '', creado: new Date().toISOString() };
       accion((s) => ({ ...s, proveedores: (s.proveedores || []).concat([nuevo]) }));
       brindar('Proveedor creado.', 'ok');
     }
@@ -2626,16 +3142,22 @@ function Proveedores({ estado, accion, brindar }) {
             {provs.map((p) => (
               <div key={p.id} className="tarjeta" style={{ padding: '14px 16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                  <div style={{ fontWeight: 700, fontSize: 15 }}>{p.nombre}</div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>{p.nombre}</div>
+                    {p.calificacion > 0 ? <div style={{display:'flex',gap:2,marginTop:3}}>{[1,2,3,4,5].map((n) => <span key={n} style={{color: n <= p.calificacion ? 'var(--ambar)' : 'var(--texto-3)', fontSize:14}}>★</span>)}</div> : null}
+                  </div>
                   <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
-                    <button className="btn-icono" onClick={() => setForm({ ...p })}><Icono n="lapiz" s={17} /></button>
+                    <button className="btn-icono" onClick={() => setForm({ ...p, calificacion: p.calificacion||0, categoria: p.categoria||'', condicionesPago: p.condicionesPago||'' })}><Icono n="lapiz" s={17} /></button>
                     <button className="btn-icono" onClick={() => borrar(p)}><Icono n="basura" s={17} /></button>
                   </div>
                 </div>
+                {p.categoria ? <div style={{marginTop:6}}><Chip estado="neutro" texto={p.categoria} /></div> : null}
                 {p.contacto ? <div className="mini" style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}><Icono n="mano_obra" s={13} />{p.contacto}</div> : null}
                 {p.telefono ? <div className="mini" style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}><Icono n="reloj" s={13} />{p.telefono}</div> : null}
                 {p.correo ? <div className="mini" style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}><Icono n="info" s={13} />{p.correo}</div> : null}
                 {p.direccion ? <div className="mini" style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}><Icono n="ubicacion" s={13} />{p.direccion}</div> : null}
+                {p.condicionesPago ? <div className="mini" style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}><Icono n="pago" s={13} />{p.condicionesPago}</div> : null}
+                {(() => { const oc = (estado.ordenes||[]).filter((o) => o.proveedor === p.nombre); return oc.length > 0 ? <div className="mini" style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}><Icono n="orden" s={13} />{oc.length} orden(es) de compra</div> : null; })()}
                 {p.notas ? <div className="mini tenue" style={{ marginTop: 6 }}>{p.notas}</div> : null}
               </div>
             ))}
@@ -2656,7 +3178,14 @@ function Proveedores({ estado, accion, brindar }) {
             <Campo etq="Correo electrónico"><input type="email" value={form.correo || ''} onChange={(e) => setForm({ ...form, correo: e.target.value })} placeholder="correo@ejemplo.com" /></Campo>
           </div>
           <Campo etq="Dirección"><input value={form.direccion || ''} onChange={(e) => setForm({ ...form, direccion: e.target.value })} placeholder="Ej. Carretera Sur km 5" /></Campo>
-          <Campo etq="Notas"><textarea value={form.notas || ''} onChange={(e) => setForm({ ...form, notas: e.target.value })} placeholder="Condiciones de pago, referencias…" /></Campo>
+          <div className="dos">
+            <Campo etq="Categoría"><input value={form.categoria || ''} onChange={(e) => setForm({ ...form, categoria: e.target.value })} placeholder="Ej. Ferretería, Mano de obra" /></Campo>
+            <Campo etq="Condiciones de pago"><input value={form.condicionesPago || ''} onChange={(e) => setForm({ ...form, condicionesPago: e.target.value })} placeholder="Ej. 30 días crédito" /></Campo>
+          </div>
+          <Campo etq={'Calificación (' + (form.calificacion || 0) + '/5)'}>
+            <div style={{display:'flex',gap:6,fontSize:24,cursor:'pointer'}}>{[1,2,3,4,5].map((n) => <span key={n} style={{color: n <= (form.calificacion||0) ? 'var(--ambar)' : 'var(--texto-3)'}} onClick={() => setForm({...form, calificacion: form.calificacion === n ? 0 : n})}>★</span>)}</div>
+          </Campo>
+          <Campo etq="Notas"><textarea value={form.notas || ''} onChange={(e) => setForm({ ...form, notas: e.target.value })} placeholder="Observaciones, referencias…" /></Campo>
         </Modal>
       ) : null}
     </div>
@@ -2782,7 +3311,11 @@ const SECCIONES = [
   { id: 'panel', etq: 'Panel', icono: 'panel' },
   { id: 'presupuesto', etq: 'Presupuesto', icono: 'presupuesto' },
   { id: 'gastos', etq: 'Gastos', icono: 'gastos' },
+  { id: 'ordenes', etq: 'Órdenes', icono: 'orden' },
+  { id: 'contratos', etq: 'Contratos', icono: 'contrato' },
+  { id: 'pagos', etq: 'Pagos', icono: 'pago' },
   { id: 'proveedores', etq: 'Proveedores', icono: 'mano_obra' },
+  { id: 'calendario', etq: 'Calendario', icono: 'calendario' },
   { id: 'ofertas', etq: 'Ofertas', icono: 'ofertas' },
   { id: 'reportes', etq: 'Reportes', icono: 'reportes' },
   { id: 'ajustes', etq: 'Ajustes', icono: 'ajustes' },
@@ -3059,7 +3592,11 @@ function App() {
     panel: <Panel estado={estado} v={v} alertas={avisos} dinero={dinero} irA={setVista} irAGastosPendientes={irAGastosPendientes} />,
     presupuesto: <Presupuesto estado={estado} v={v} dinero={dinero} accion={accion} brindar={brindar} />,
     gastos: <Gastos estado={estado} dinero={dinero} accion={accion} brindar={brindar} filtroInicial={filtroGastos} limpiarFiltroInicial={() => setFiltroGastos(null)} />,
+    ordenes: <Ordenes estado={estado} dinero={dinero} accion={accion} brindar={brindar} />,
+    contratos: <Contratos estado={estado} dinero={dinero} accion={accion} brindar={brindar} />,
+    pagos: <Pagos estado={estado} dinero={dinero} accion={accion} brindar={brindar} />,
     proveedores: <Proveedores estado={estado} accion={accion} brindar={brindar} />,
+    calendario: <CalendarioPagos estado={estado} dinero={dinero} />,
     ofertas: <Ofertas estado={estado} dinero={dinero} accion={accion} brindar={brindar} />,
     reportes: <Reportes estado={estado} v={v} dinero={dinero} brindar={brindar} />,
     ajustes: <Ajustes estado={estado} accion={accion} brindar={brindar} instalar={instalar} puedeInstalar={!!promptPWA} irA={setVista} />,
@@ -3067,7 +3604,8 @@ function App() {
 
   const titulos = {
     proyectos: 'Cartera de proyectos', panel: 'Panel general', presupuesto: 'Presupuesto',
-    gastos: 'Gastos', proveedores: 'Proveedores', ofertas: 'Ofertas', reportes: 'Reportes', ajustes: 'Ajustes',
+    gastos: 'Gastos', ordenes: 'Órdenes de compra', contratos: 'Contratos', pagos: 'Pagos',
+    proveedores: 'Proveedores', calendario: 'Calendario de pagos', ofertas: 'Ofertas', reportes: 'Reportes', ajustes: 'Ajustes',
   };
 
   return (

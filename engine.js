@@ -93,6 +93,38 @@
                     // se descarga de esta URL". Ver supaFotos* en index.html.
     }
   */
+  // Estados para órdenes de compra
+  const ESTADOS_ORDEN = [
+    { id: 'borrador', label: 'Borrador' },
+    { id: 'solicitada', label: 'Solicitada' },
+    { id: 'aprobada', label: 'Aprobada' },
+    { id: 'recibida', label: 'Recibida' },
+    { id: 'cancelada', label: 'Cancelada' },
+  ];
+
+  // Estados para contratos
+  const ESTADOS_CONTRATO = [
+    { id: 'vigente', label: 'Vigente' },
+    { id: 'completado', label: 'Completado' },
+    { id: 'cancelado', label: 'Cancelado' },
+  ];
+
+  // Tipos de pago
+  const TIPOS_PAGO = [
+    { id: 'abono', label: 'Abono' },
+    { id: 'adelanto_material', label: 'Adelanto material' },
+    { id: 'adelanto_mano_obra', label: 'Adelanto mano de obra' },
+    { id: 'anticipo', label: 'Anticipo' },
+    { id: 'liquidacion', label: 'Liquidación' },
+  ];
+
+  const METODOS_PAGO = [
+    { id: 'efectivo', label: 'Efectivo' },
+    { id: 'transferencia', label: 'Transferencia' },
+    { id: 'cheque', label: 'Cheque' },
+    { id: 'tarjeta', label: 'Tarjeta' },
+  ];
+
   function estadoVacio() {
     return {
       version: 1,
@@ -103,6 +135,9 @@
       gastos: [],
       licitaciones: [],
       proveedores: [],
+      ordenes: [],
+      contratos: [],
+      pagos: [],
       fotosNube: [],
     };
   }
@@ -154,6 +189,158 @@
       fechaVencimiento,
       creado: g.creado || new Date().toISOString(),
     });
+  }
+
+  /* ============================================================
+     ÓRDENES DE COMPRA
+     ============================================================ */
+  function normalizarOrden(o) {
+    const items = (o.items || []).map((it) => ({
+      descripcion: it.descripcion || '',
+      cantidad: num(it.cantidad),
+      unidad: it.unidad || 'unidad',
+      precioUnitario: r2(it.precioUnitario),
+      marca: it.marca || '',
+    }));
+    const subtotal = r2(items.reduce((s, it) => s + r2(it.cantidad * it.precioUnitario), 0));
+    const impuesto = r2(subtotal * num(o.iva || 0) / 100);
+    const retencionIR = o.retencionIR ? r2(subtotal * 0.02) : 0;
+    const total = r2(subtotal + impuesto - retencionIR);
+    return {
+      id: o.id || uid('oc'),
+      proyectoId: o.proyectoId,
+      numero: o.numero || '',
+      proveedor: o.proveedor || '',
+      estado: o.estado || 'borrador',
+      items,
+      subtotal, impuesto, retencionIR, total,
+      iva: num(o.iva || 15),
+      retencionIR: !!o.retencionIR,
+      fechaCreacion: o.fechaCreacion || hoy(),
+      fechaAprobacion: o.fechaAprobacion || '',
+      fechaEntrega: o.fechaEntrega || '',
+      fechaRecepcion: o.fechaRecepcion || '',
+      solicitadoPor: o.solicitadoPor || '',
+      aprobadoPor: o.aprobadoPor || '',
+      notas: o.notas || '',
+      creado: o.creado || new Date().toISOString(),
+    };
+  }
+
+  /* ============================================================
+     CONTRATOS
+     ============================================================ */
+  function normalizarContrato(c) {
+    const montoContrato = r2(c.montoContrato);
+    const anticipo = r2(c.anticipo);
+    const retencion = r2(c.retencion);
+    return {
+      id: c.id || uid('co'),
+      proyectoId: c.proyectoId,
+      proveedor: c.proveedor || '',
+      titulo: c.titulo || 'Contrato sin título',
+      montoContrato,
+      anticipo,
+      retencion,
+      fechaInicio: c.fechaInicio || hoy(),
+      fechaFin: c.fechaFin || '',
+      estado: c.estado || 'vigente',
+      avance: num(c.avance),
+      notas: c.notas || '',
+      creado: c.creado || new Date().toISOString(),
+    };
+  }
+
+  /* ============================================================
+     PAGOS (ABONOS, ADELANTOS, ANTICIPOS)
+     ============================================================ */
+  function normalizarPago(p) {
+    return {
+      id: p.id || uid('pg'),
+      proyectoId: p.proyectoId,
+      contratoId: p.contratoId || '',
+      tipo: p.tipo || 'abono',
+      metodo: p.metodo || 'efectivo',
+      referencia: p.referencia || '',
+      monto: r2(p.monto),
+      fecha: p.fecha || hoy(),
+      proveedorId: p.proveedorId || '',
+      trabajador: p.trabajador || '',
+      descripcion: p.descripcion || '',
+      notas: p.notas || '',
+      creado: p.creado || new Date().toISOString(),
+    };
+  }
+
+  function resumenPagosContrato(pagos, contratoId) {
+    const propios = pagos.filter((p) => p.contratoId === contratoId);
+    return {
+      total: r2(propios.reduce((s, p) => s + num(p.monto), 0)),
+      cantidad: propios.length,
+      pagos: propios.sort((a, b) => a.fecha < b.fecha ? 1 : -1),
+    };
+  }
+
+  /* ============================================================
+     FLUJO DE CAJA — proyección de entradas y salidas
+     ============================================================ */
+  function flujoDeCaja(proyectoId, gastos, ordenes, contratos, pagos, mesesAtras, mesesAdelante) {
+    mesesAtras = mesesAtras || 3;
+    mesesAdelante = mesesAdelante || 3;
+    const ahora = new Date();
+    const resultado = [];
+
+    for (let i = -mesesAtras; i <= mesesAdelante; i++) {
+      const d = new Date(ahora.getFullYear(), ahora.getMonth() + i, 1);
+      const ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+      const etiqueta = nombreMes(ym);
+
+      // Salidas: gastos pagados en este mes
+      const salGastos = r2(gastos.filter((g) => g.proyectoId === proyectoId && g.pagado && mesDe(g.fecha) === ym)
+        .reduce((s, g) => s + num(g.monto), 0));
+
+      // Salidas: pagos realizados en este mes
+      const salPagos = r2((pagos || []).filter((p) => p.proyectoId === proyectoId && mesDe(p.fecha) === ym)
+        .reduce((s, p) => s + num(p.monto), 0));
+
+      // Salidas futuras: gastos no pagados con vencimiento este mes
+      const salPendientes = r2(gastos.filter((g) => g.proyectoId === proyectoId && !g.pagado && mesDe(g.fechaVencimiento) === ym)
+        .reduce((s, g) => s + num(g.monto), 0));
+
+      // Salidas futuras: órdenes aprobadas con entrega este mes
+      const salOrdenes = r2((ordenes || []).filter((o) => o.proyectoId === proyectoId && o.estado === 'aprobada' && mesDe(o.fechaEntrega) === ym)
+        .reduce((s, o) => s + num(o.total), 0));
+
+      const totalSalidas = r2(salGastos + salPagos + salPendientes + salOrdenes);
+      const esFuturo = i > 0;
+
+      resultado.push({
+        mes: ym, etiqueta, esFuturo,
+        salidas: totalSalidas,
+        gastosReales: salGastos,
+        pagosReales: salPagos,
+        pendientes: salPendientes,
+        ordenesAprobadas: salOrdenes,
+      });
+    }
+    return resultado;
+  }
+
+  /* ============================================================
+     CALENDARIO DE PAGOS — eventos de un mes
+     ============================================================ */
+  function calendarioPagos(proyectoId, gastos, ordenes, contratos, pagos, mes) {
+    const evs = [];
+    // Gastos no pagados con vencimiento
+    (gastos || []).filter((g) => g.proyectoId === proyectoId && !g.pagado && g.fechaVencimiento && mesDe(g.fechaVencimiento) === mes)
+      .forEach((g) => evs.push({ tipo: 'gasto', fecha: g.fechaVencimiento, desc: g.descripcion || 'Gasto', monto: g.monto, proveedor: g.proveedor }));
+    // Órdenes aprobadas con fecha de entrega
+    (ordenes || []).filter((o) => o.proyectoId === proyectoId && o.estado === 'aprobada' && o.fechaEntrega && mesDe(o.fechaEntrega) === mes)
+      .forEach((o) => evs.push({ tipo: 'orden', fecha: o.fechaEntrega, desc: 'OC ' + o.numero, monto: o.total, proveedor: o.proveedor }));
+    // Pagos realizados
+    (pagos || []).filter((p) => p.proyectoId === proyectoId && mesDe(p.fecha) === mes)
+      .forEach((p) => evs.push({ tipo: 'pago', fecha: p.fecha, desc: p.descripcion, monto: p.monto, proveedor: '' }));
+    return evs;
   }
 
   /* ============================================================
@@ -728,7 +915,30 @@
         { id: uid('of'), proveedor: 'Importadora Piso Real', precioUnitario: 528, total: 0, dias: 7, calidad: 5, garantia: 24, notas: 'Entrega inmediata y garantía extendida.' },
       ],
     };
-    return { proyecto: p, categorias: cats, gastos, licitaciones: [lic] };
+    // Órdenes de ejemplo
+    const ordenes = [
+      normalizarOrden({ proyectoId: p.id, numero: 'OC-001', proveedor: 'Ferretería Jenny', estado: 'aprobada', iva: 15, fechaEntrega: f(-5),
+        items: [{ descripcion: 'Cemento gris 42.5 kg', cantidad: 50, unidad: 'bolsa', precioUnitario: 385, marca: 'Canal' },
+                { descripcion: 'Arena lavada', cantidad: 8, unidad: 'm3', precioUnitario: 1450, marca: '' }],
+        solicitadoPor: 'Walter', aprobadoPor: 'Walter', fechaAprobacion: f(10) }),
+      normalizarOrden({ proyectoId: p.id, numero: 'OC-002', proveedor: 'Techos MG', estado: 'solicitada', iva: 15,
+        items: [{ descripcion: 'Lámina troquelada cal. 26', cantidad: 30, unidad: 'lám', precioUnitario: 1180, marca: 'Metalco' }],
+        solicitadoPor: 'Walter' }),
+    ];
+    // Contrato de ejemplo
+    const contratos = [
+      normalizarContrato({ proyectoId: p.id, proveedor: 'Cuadrilla local', titulo: 'Mano de obra general — remodelación completa',
+        montoContrato: 300000, anticipo: 60000, retencion: 15000, fechaInicio: f(70), fechaFin: f(-30),
+        estado: 'vigente', avance: 45, notas: 'Pago quincenal según avance certificado.' }),
+    ];
+    // Pagos de ejemplo
+    const pagos = [
+      normalizarPago({ proyectoId: p.id, contratoId: contratos[0].id, tipo: 'anticipo', metodo: 'transferencia',
+        monto: 60000, fecha: f(65), descripcion: 'Anticipo contrato mano de obra', referencia: 'TRF-1001' }),
+      normalizarPago({ proyectoId: p.id, contratoId: contratos[0].id, tipo: 'abono', metodo: 'cheque',
+        monto: 46000, fecha: f(14), descripcion: 'Abono quincena 1', referencia: 'CHQ-2050' }),
+    ];
+    return { proyecto: p, categorias: cats, gastos, licitaciones: [lic], ordenes, contratos, pagos };
   }
 
   // Segundo proyecto de ejemplo, más chico y con un sobrecosto visible.
@@ -769,6 +979,9 @@
     e.categorias = a.categorias.concat(b.categorias);
     e.gastos = a.gastos.concat(b.gastos);
     e.licitaciones = a.licitaciones.concat(b.licitaciones);
+    e.ordenes = (a.ordenes || []).concat(b.ordenes || []);
+    e.contratos = (a.contratos || []).concat(b.contratos || []);
+    e.pagos = (a.pagos || []).concat(b.pagos || []);
     e.proyectoActivo = a.proyecto.id;
     return e;
   }
@@ -778,14 +991,18 @@
     num, r2, pct, uid, hoy, mesDe, nombreMes,
     // catálogos
     TIPOS_GASTO, CATEGORIAS_BASE, FASES, ICONOS, PESOS_DEFECTO, ESTADOS, ESTADOS_PROYECTO,
+    ESTADOS_ORDEN, ESTADOS_CONTRATO, TIPOS_PAGO, METODOS_PAGO,
     // esquema
     estadoVacio, estadoDemo, nuevoProyecto, categoriasIniciales, normalizarGasto, proyectoDemo,
+    normalizarOrden, normalizarContrato, normalizarPago,
     // motores
     clasificar, varianzaCategoria, varianzaProyecto,
     totalOferta, compararOfertas,
     reporteMensual, reportePorFase, alertas,
     diasHasta, gastosProximosAVencer,
     resumenCartera, clonarProyecto, ubicacionesUsadas, resumenPorUbicacion,
+    // nuevos módulos
+    resumenPagosContrato, flujoDeCaja, calendarioPagos,
   };
 
   global.ENGINE = ENGINE;
