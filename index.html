@@ -1561,7 +1561,16 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
                           ) : <span className="tenue" style={{ fontSize: 12 }}>—</span>}
                         </td>
                         <td className="cen">
-                          {g._esPago ? <span className="tenue" style={{ fontSize: 12 }}>—</span> : (
+                          {g._esPago ? (
+                            nFotos > 0 ? (
+                              <React.Fragment>
+                                <button className="btn-icono" onClick={() => abrirVisor(g)} title={'Ver ' + nFotos + ' comprobante(s)'}>
+                                  <Icono n="camara" s={17} c="var(--ambar)" />
+                                </button>
+                                <span className="mini mono">{nFotos}</span>
+                              </React.Fragment>
+                            ) : <span className="tenue" style={{ fontSize: 12 }}>—</span>
+                          ) : (
                             <React.Fragment>
                               <button className="btn-icono" onClick={() => nFotos ? abrirVisor(g) : abrirEdicion(g)} title={nFotos ? 'Ver ' + nFotos + ' adjunto(s)' : 'Agregar foto o PDF'}>
                                 <Icono n="camara" s={17} c={nFotos ? 'var(--ambar)' : 'var(--texto-3)'} />
@@ -2852,12 +2861,68 @@ function Pagos({ estado, dinero, accion, brindar, registrarBorrado }) {
   const [form, setForm] = useState(null);
   const [fTipo, setFTipo] = useState('');
   const [fCont, setFCont] = useState('');
+  const [fotos, setFotos] = useState([]);
+  const [subiendo, setSubiendo] = useState(false);
+  const [conteoFotos, setConteoFotos] = useState({});
+  const [fotoAmpliada, setFotoAmpliada] = useState(null);
+  const [visorPago, setVisorPago] = useState(null);
+  const [visorFotos, setVisorFotos] = useState([]);
+  const inputCamP = useRef(null);
+  const inputGalP = useRef(null);
 
   const contratosProyecto = (estado.contratos || []).filter((c) => c.proyectoId === estado.proyectoActivo);
   const contMap = {};
   contratosProyecto.forEach((c) => contMap[c.id] = c);
   const provMap = {};
   (estado.proveedores||[]).forEach((p) => provMap[p.id] = p.nombre);
+
+  const refrescarConteoP = () => {
+    FOTOS.todas().then((t) => setConteoFotos(FOTOS.contarPorGasto(t))).catch(() => {});
+  };
+  useEffect(refrescarConteoP, [estado.pagos]);
+
+  useEffect(() => {
+    if (!form) { setFotos([]); return; }
+    let vivo = true;
+    FOTOS.listarPorGasto(form.id).then((l) => { if (vivo) setFotos(l); }).catch(() => { if (vivo) setFotos([]); });
+    return () => { vivo = false; };
+  }, [form && form.id]);
+
+  const agregarFotosP = async (archivos) => {
+    if (!archivos || archivos.length === 0) return;
+    setSubiendo(true);
+    try {
+      for (const archivo of Array.from(archivos)) {
+        if (!FOTOS.puedeAgregarMas(fotos)) { brindar('Máximo ' + FOTOS.MAX_FOTOS_POR_GASTO + ' adjuntos.', 'err'); break; }
+        const esPDF = archivo.type === 'application/pdf';
+        const esImagen = /^image\//.test(archivo.type);
+        if (!esImagen && !esPDF) { brindar('"' + archivo.name + '" no es imagen ni PDF.', 'err'); continue; }
+        if (esPDF && archivo.size > 10 * 1024 * 1024) { brindar('"' + archivo.name + '" demasiado grande (máx 10MB).', 'err'); continue; }
+        try {
+          if (esPDF) {
+            const dataURL = await FOTOS.leerArchivoComoDataURL(archivo);
+            const registro = await FOTOS.guardar(form.id, dataURL, 0, 0, 'pdf');
+            registro.nombre = archivo.name;
+            setFotos((f) => f.concat([registro]));
+          } else {
+            const { dataURL, ancho, alto } = await FOTOS.comprimirArchivo(archivo);
+            const registro = await FOTOS.guardar(form.id, dataURL, ancho, alto, 'image');
+            setFotos((f) => f.concat([registro]));
+          }
+        } catch (e) { brindar('No se pudo procesar "' + archivo.name + '".', 'err'); }
+      }
+    } finally { setSubiendo(false); refrescarConteoP(); }
+  };
+
+  const quitarFotoP = (id) => {
+    FOTOS.eliminar(id).then(() => { setFotos((f) => f.filter((x) => x.id !== id)); refrescarConteoP(); }).catch(() => brindar('No se pudo borrar.', 'err'));
+  };
+
+  const abrirVisorP = (p) => {
+    setVisorPago(p);
+    setVisorFotos([]);
+    FOTOS.listarPorGasto(p.id).then((l) => setVisorFotos(l)).catch(() => setVisorFotos([]));
+  };
 
   const pagos = (estado.pagos || []).filter((p) => p.proyectoId === estado.proyectoActivo
     && (!fTipo || p.tipo === fTipo)
@@ -2866,7 +2931,12 @@ function Pagos({ estado, dinero, accion, brindar, registrarBorrado }) {
 
   const total = E.r2(pagos.reduce((s, p) => s + E.num(p.monto), 0));
   const cats = (estado.categorias || []).filter((c) => c.proyectoId === estado.proyectoActivo);
-  const formVacio = () => ({ id: null, tipo: 'abono', metodo: 'efectivo', referencia: '', monto: '', fecha: E.hoy(), contratoId: '', categoriaId: '', proveedorId: '', trabajador: '', descripcion: '', notas: '', _esNuevo: true });
+  const formVacio = () => ({ id: E.uid('pg'), tipo: 'abono', metodo: 'efectivo', referencia: '', monto: '', fecha: E.hoy(), contratoId: '', categoriaId: '', proveedorId: '', trabajador: '', descripcion: '', notas: '', _esNuevo: true });
+
+  const cerrarFormP = () => {
+    if (form && form._esNuevo) FOTOS.eliminarPorGasto(form.id).catch(() => {});
+    setForm(null);
+  };
 
   const guardarPago = () => {
     if (E.num(form.monto) <= 0) return brindar('El monto debe ser mayor a cero.', 'err');
@@ -2881,6 +2951,7 @@ function Pagos({ estado, dinero, accion, brindar, registrarBorrado }) {
     if (!confirm('¿Borrar este pago?')) return;
     registrarBorrado(p.id);
     accion((s) => ({ ...s, pagos: (s.pagos||[]).filter((x) => x.id !== p.id) }));
+    FOTOS.eliminarPorGasto(p.id).then(refrescarConteoP).catch(() => {});
     brindar('Pago eliminado.', 'ok');
   };
 
@@ -2906,9 +2977,11 @@ function Pagos({ estado, dinero, accion, brindar, registrarBorrado }) {
           <React.Fragment>
             <div className="tabla-cont">
               <table>
-                <thead><tr><th style={{width:78}}>Fecha</th><th>Descripción</th><th>Contrato</th><th className="cen">Tipo</th><th>Método</th><th className="der">Monto</th><th className="der"></th></tr></thead>
+                <thead><tr><th style={{width:78}}>Fecha</th><th>Descripción</th><th>Contrato</th><th className="cen">Tipo</th><th>Método</th><th className="der">Monto</th><th className="cen" style={{width:40}}></th><th className="der"></th></tr></thead>
                 <tbody>
-                  {pagos.map((p) => (
+                  {pagos.map((p) => {
+                    const nF = conteoFotos[p.id] || 0;
+                    return (
                     <tr key={p.id}>
                       <td className="mono" style={{fontSize:13}}>{fFecha(p.fecha)}</td>
                       <td><div style={{fontWeight:600}}>{p.descripcion}</div>{p.referencia ? <div className="mini">Ref: {p.referencia}</div> : null}</td>
@@ -2916,12 +2989,19 @@ function Pagos({ estado, dinero, accion, brindar, registrarBorrado }) {
                       <td className="cen"><Chip estado={CHIP_TIPO[p.tipo]||'neutro'} texto={etqTipo(p.tipo)} /></td>
                       <td style={{fontSize:13}}>{etqMetodo(p.metodo)}</td>
                       <td className="der mono" style={{fontWeight:700}}>{dinero(p.monto)}</td>
+                      <td className="cen">
+                        <button className="btn-icono" onClick={() => nF ? abrirVisorP(p) : setForm({...p,monto:String(p.monto),contratoId:p.contratoId||'',categoriaId:p.categoriaId||'',referencia:p.referencia||'',trabajador:p.trabajador||'',descripcion:p.descripcion||'',notas:p.notas||'',_esNuevo:false})} title={nF ? 'Ver ' + nF + ' adjunto(s)' : 'Agregar comprobante'}>
+                          <Icono n="camara" s={17} c={nF ? 'var(--ambar)' : 'var(--texto-3)'} />
+                        </button>
+                        {nF > 0 ? <span className="mini mono">{nF}</span> : null}
+                      </td>
                       <td className="der" style={{whiteSpace:'nowrap'}}>
                         <button className="btn-icono" onClick={() => setForm({...p,monto:String(p.monto),contratoId:p.contratoId||'',categoriaId:p.categoriaId||'',referencia:p.referencia||'',trabajador:p.trabajador||'',descripcion:p.descripcion||'',notas:p.notas||'',_esNuevo:false})}><Icono n="lapiz" s={17} /></button>
                         <button className="btn-icono" onClick={() => borrarPago(p)}><Icono n="basura" s={17} /></button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -2933,8 +3013,8 @@ function Pagos({ estado, dinero, accion, brindar, registrarBorrado }) {
         )}
       </div>
       {form ? (
-        <Modal titulo={form._esNuevo ? 'Registrar pago' : 'Editar pago'} onCerrar={() => setForm(null)}
-          pie={<React.Fragment><button className="btn" onClick={() => setForm(null)}>Cancelar</button><button className="btn btn-p" onClick={guardarPago}><Icono n="check" s={16} />Guardar</button></React.Fragment>}>
+        <Modal titulo={form._esNuevo ? 'Registrar pago' : 'Editar pago'} onCerrar={cerrarFormP}
+          pie={<React.Fragment><button className="btn" onClick={cerrarFormP}>Cancelar</button><button className="btn btn-p" onClick={guardarPago}><Icono n="check" s={16} />Guardar</button></React.Fragment>}>
           <Campo etq="Descripción"><input value={form.descripcion} autoFocus placeholder="Ej. Abono materiales semana 3" onChange={(e) => setForm({...form,descripcion:e.target.value})} /></Campo>
           <div className="dos">
             <Campo etq="Tipo"><select value={form.tipo} onChange={(e) => setForm({...form,tipo:e.target.value})}>{E.TIPOS_PAGO.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}</select></Campo>
@@ -2951,8 +3031,76 @@ function Pagos({ estado, dinero, accion, brindar, registrarBorrado }) {
           </div>
           {form.contratoId && contMap[form.contratoId] ? (() => { const ct = contMap[form.contratoId]; const ab = E.r2((estado.pagos||[]).filter((p) => p.contratoId === form.contratoId && p.id !== form.id).reduce((s,p) => s + E.num(p.monto), 0)); const saldo = E.r2(E.num(ct.montoContrato) - ab); return <div style={{background:'var(--fondo-elev)',borderRadius:8,padding:'10px 14px',marginBottom:14,fontSize:13}}><div className="dos"><div><span className="tenue">Monto contrato: </span><span className="mono" style={{fontWeight:700}}>{dinero(ct.montoContrato, true)}</span></div><div><span className="tenue">Ya abonado: </span><span className="mono">{dinero(ab, true)}</span></div></div><div style={{marginTop:6}}><span className="tenue">Saldo pendiente: </span><span className="mono" style={{fontWeight:700,color: saldo > 0 ? 'var(--rojo)' : 'var(--menta)'}}>{dinero(saldo, true)}</span></div></div>; })() : null}
           <Campo etq="Trabajador (opcional)"><input value={form.trabajador||''} placeholder="Nombre del trabajador" onChange={(e) => setForm({...form,trabajador:e.target.value})} /></Campo>
+          <Campo etq={'Comprobantes (' + fotos.length + '/' + FOTOS.MAX_FOTOS_POR_GASTO + ')'}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 9 }}>
+              {fotos.map((f) => (
+                <div key={f.id} style={{ position: 'relative', width: 68, height: 68, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--borde)' }}>
+                  {f.tipo === 'pdf' ? (
+                    <a href={f.dataURL} target="_blank" rel="noopener noreferrer"
+                      style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--panel-2)', textDecoration: 'none', color: 'var(--rojo)' }}>
+                      <span style={{ fontSize: 22, fontWeight: 700 }}>PDF</span>
+                      <span style={{ fontSize: 9, color: 'var(--texto-3)', maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.nombre || 'documento'}</span>
+                    </a>
+                  ) : (
+                    <img src={f.dataURL} alt="Comprobante" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', cursor: 'zoom-in' }} onClick={() => setFotoAmpliada(f.dataURL)} />
+                  )}
+                  <button onClick={() => quitarFotoP(f.id)} title="Quitar"
+                    style={{ position: 'absolute', top: 2, right: 2, width: 20, height: 20, borderRadius: '50%', background: 'rgba(8,17,19,.85)', display: 'grid', placeItems: 'center' }}>
+                    <Icono n="equis" s={12} c="#fff" />
+                  </button>
+                </div>
+              ))}
+              {FOTOS.puedeAgregarMas(fotos) ? (
+                <React.Fragment>
+                  <button onClick={() => inputCamP.current && inputCamP.current.click()} disabled={subiendo}
+                    style={{ width: 68, height: 68, borderRadius: 10, border: '1px dashed var(--borde-fuerte)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, color: 'var(--texto-2)' }}>
+                    <Icono n="camara" s={19} /><span style={{ fontSize: 10 }}>Cámara</span>
+                  </button>
+                  <button onClick={() => inputGalP.current && inputGalP.current.click()} disabled={subiendo}
+                    style={{ width: 68, height: 68, borderRadius: 10, border: '1px dashed var(--borde-fuerte)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, color: 'var(--texto-2)' }}>
+                    <Icono n="ofertas" s={19} /><span style={{ fontSize: 10 }}>Archivo</span>
+                  </button>
+                </React.Fragment>
+              ) : null}
+              {subiendo ? <div style={{ width: 68, height: 68, borderRadius: 10, background: 'var(--panel-2)', display: 'grid', placeItems: 'center' }}><span className="mini">…</span></div> : null}
+            </div>
+            <input ref={inputCamP} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+              onChange={(e) => { agregarFotosP(e.target.files); e.target.value = ''; }} />
+            <input ref={inputGalP} type="file" accept="image/*,application/pdf" multiple style={{ display: 'none' }}
+              onChange={(e) => { agregarFotosP(e.target.files); e.target.value = ''; }} />
+            <div className="mini" style={{ marginTop: 8 }}>Fotos o PDF de comprobantes.</div>
+          </Campo>
           <Campo etq="Notas"><textarea value={form.notas||''} onChange={(e) => setForm({...form,notas:e.target.value})} /></Campo>
         </Modal>
+      ) : null}
+      {visorPago ? (
+        <Modal titulo={'Comprobantes — ' + (visorPago.descripcion || 'Pago')} onCerrar={() => setVisorPago(null)}
+          pie={<button className="btn" onClick={() => setVisorPago(null)}>Cerrar</button>}>
+          {visorFotos.length === 0 ? (
+            <p className="tenue" style={{ textAlign: 'center', padding: 24 }}>Sin comprobantes</p>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+              {visorFotos.map((f) => (
+                <div key={f.id} style={{ width: 120, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--borde)' }}>
+                  {f.tipo === 'pdf' ? (
+                    <a href={f.dataURL} target="_blank" rel="noopener noreferrer"
+                      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 100, background: 'var(--panel-2)', textDecoration: 'none', color: 'var(--rojo)' }}>
+                      <span style={{ fontSize: 28, fontWeight: 700 }}>PDF</span>
+                      <span style={{ fontSize: 10, color: 'var(--texto-3)' }}>{f.nombre || 'documento'}</span>
+                    </a>
+                  ) : (
+                    <img src={f.dataURL} alt="Comprobante" style={{ width: '100%', height: 100, objectFit: 'cover', cursor: 'zoom-in' }} onClick={() => setFotoAmpliada(f.dataURL)} />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </Modal>
+      ) : null}
+      {fotoAmpliada ? (
+        <div onClick={() => setFotoAmpliada(null)} style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,.92)', display: 'grid', placeItems: 'center', cursor: 'zoom-out' }}>
+          <img src={fotoAmpliada} style={{ maxWidth: '95vw', maxHeight: '92vh', borderRadius: 10 }} />
+        </div>
       ) : null}
     </div>
   );
