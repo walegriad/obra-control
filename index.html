@@ -1318,7 +1318,7 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
           break;
         }
         const esPDF = archivo.type === 'application/pdf';
-        const esImagen = /^image\//.test(archivo.type);
+        const esImagen = /^image\//.test(archivo.type) || /\.(heic|heif)$/i.test(archivo.name);
         if (!esImagen && !esPDF) {
           brindar('"' + archivo.name + '" no es imagen ni PDF.', 'err');
           continue;
@@ -1841,9 +1841,9 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
                   ) : null}
                   {subiendo ? <div style={{ width: 68, height: 68, borderRadius: 10, background: 'var(--panel-2)', display: 'grid', placeItems: 'center' }}><span className="mini">…</span></div> : null}
                 </div>
-                <input ref={inputCamara} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+                <input ref={inputCamara} type="file" accept="image/*,.heic,.heif" capture="environment" style={{ display: 'none' }}
                   onChange={(e) => { agregarFotos(e.target.files); e.target.value = ''; }} />
-                <input ref={inputGaleria} type="file" accept="image/*,application/pdf" multiple style={{ display: 'none' }}
+                <input ref={inputGaleria} type="file" accept="image/*,.heic,.heif,application/pdf" multiple style={{ display: 'none' }}
                   onChange={(e) => { agregarFotos(e.target.files); e.target.value = ''; }} />
                 <div className="mini" style={{ marginTop: 8 }}>Imágenes o PDF. Se guarda en este dispositivo, no se sube a internet.</div>
               </Campo>
@@ -1937,7 +1937,7 @@ function Ofertas({ estado, dinero, accion, brindar, registrarBorrado }) {
         brindar('Máximo ' + FOTOS.MAX_FOTOS_POR_GASTO + ' adjuntos por oferta.', 'err'); break;
       }
       const esPDF = archivo.type === 'application/pdf';
-      const esImagen = /^image\//.test(archivo.type);
+      const esImagen = /^image\//.test(archivo.type) || /\.(heic|heif)$/i.test(archivo.name);
       if (!esImagen && !esPDF) { brindar('"' + archivo.name + '" no es imagen ni PDF.', 'err'); continue; }
       if (esPDF && archivo.size > 10 * 1024 * 1024) { brindar('"' + archivo.name + '" es demasiado grande (máx 10MB).', 'err'); continue; }
       try {
@@ -2370,11 +2370,11 @@ function Ofertas({ estado, dinero, accion, brindar, registrarBorrado }) {
                     <React.Fragment>
                       <label style={{ width: 60, height: 60, borderRadius: 9, border: '1px dashed var(--borde-fuerte)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, color: 'var(--texto-2)', cursor: 'pointer' }}>
                         <Icono n="camara" s={17} /><span style={{ fontSize: 9 }}>Cámara</span>
-                        <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={(e) => { agregarFotoOferta(o.id, e.target.files); e.target.value = ''; }} />
+                        <input type="file" accept="image/*,.heic,.heif" capture="environment" style={{ display: 'none' }} onChange={(e) => { agregarFotoOferta(o.id, e.target.files); e.target.value = ''; }} />
                       </label>
                       <label style={{ width: 60, height: 60, borderRadius: 9, border: '1px dashed var(--borde-fuerte)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, color: 'var(--texto-2)', cursor: 'pointer' }}>
                         <Icono n="ofertas" s={17} /><span style={{ fontSize: 9 }}>Galería</span>
-                        <input type="file" accept="image/*,application/pdf" multiple style={{ display: 'none' }} onChange={(e) => { agregarFotoOferta(o.id, e.target.files); e.target.value = ''; }} />
+                        <input type="file" accept="image/*,.heic,.heif,application/pdf" multiple style={{ display: 'none' }} onChange={(e) => { agregarFotoOferta(o.id, e.target.files); e.target.value = ''; }} />
                       </label>
                     </React.Fragment>
                   ) : null}
@@ -2895,7 +2895,7 @@ function Pagos({ estado, dinero, accion, brindar, registrarBorrado }) {
       for (const archivo of Array.from(archivos)) {
         if (!FOTOS.puedeAgregarMas(fotos)) { brindar('Máximo ' + FOTOS.MAX_FOTOS_POR_GASTO + ' adjuntos.', 'err'); break; }
         const esPDF = archivo.type === 'application/pdf';
-        const esImagen = /^image\//.test(archivo.type);
+        const esImagen = /^image\//.test(archivo.type) || /\.(heic|heif)$/i.test(archivo.name);
         if (!esImagen && !esPDF) { brindar('"' + archivo.name + '" no es imagen ni PDF.', 'err'); continue; }
         if (esPDF && archivo.size > 10 * 1024 * 1024) { brindar('"' + archivo.name + '" demasiado grande (máx 10MB).', 'err'); continue; }
         try {
@@ -3064,9 +3064,9 @@ function Pagos({ estado, dinero, accion, brindar, registrarBorrado }) {
               ) : null}
               {subiendo ? <div style={{ width: 68, height: 68, borderRadius: 10, background: 'var(--panel-2)', display: 'grid', placeItems: 'center' }}><span className="mini">…</span></div> : null}
             </div>
-            <input ref={inputCamP} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+            <input ref={inputCamP} type="file" accept="image/*,.heic,.heif" capture="environment" style={{ display: 'none' }}
               onChange={(e) => { agregarFotosP(e.target.files); e.target.value = ''; }} />
-            <input ref={inputGalP} type="file" accept="image/*,application/pdf" multiple style={{ display: 'none' }}
+            <input ref={inputGalP} type="file" accept="image/*,.heic,.heif,application/pdf" multiple style={{ display: 'none' }}
               onChange={(e) => { agregarFotosP(e.target.files); e.target.value = ''; }} />
             <div className="mini" style={{ marginTop: 8 }}>Fotos o PDF de comprobantes.</div>
           </Campo>
