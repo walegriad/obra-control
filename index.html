@@ -43,7 +43,7 @@
   --radio-sm:10px;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;padding:0}
+html,body{margin:0;padding:0;overflow-x:hidden}
 body{
   background:var(--fondo);
   background-image:
@@ -258,9 +258,9 @@ input[type=range]::-moz-range-thumb{width:17px;height:17px;border-radius:50%;bac
   .barra-inf{
     display:flex;position:fixed;bottom:0;left:0;right:0;z-index:50;
     background:rgba(11,24,27,.97);backdrop-filter:blur(14px);border-top:1px solid var(--borde);
-    padding:8px 4px calc(8px + env(safe-area-inset-bottom));
+    padding:8px 4px calc(8px + env(safe-area-inset-bottom));max-width:100vw;overflow-x:auto;
   }
-  .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px;color:var(--texto-3);font-size:10px;font-weight:600;border-radius:9px}
+  .tab{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px;color:var(--texto-3);font-size:10px;font-weight:600;border-radius:9px}
   .tab.on{color:var(--ambar)}
   .cabecera h1{font-size:24px}
   .cabecera{align-items:flex-start;margin-bottom:18px}
@@ -284,6 +284,7 @@ input[type=range]::-moz-range-thumb{width:17px;height:17px;border-radius:50%;bac
   .velo{padding:12px 10px}
   .acciones{width:100%}
   .acciones .btn{flex:1;justify-content:center}
+  table{min-width:0}
   .tabla-cont{margin:0 -15px;padding:0 15px}
   /* Banner totales de presupuesto: 1 columna en móvil */
   .presup-banner{grid-template-columns:1fr!important}
