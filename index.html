@@ -1248,7 +1248,7 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
       return {
         id: p.id,
         proyectoId: p.proyectoId,
-        categoriaId: contrato.categoriaId || '',
+        categoriaId: p.categoriaId || contrato.categoriaId || '',
         fecha: p.fecha,
         descripcion: (ETQ_PAGO[p.tipo] || 'Pago') + ' — ' + (contrato.titulo || 'Contrato'),
         proveedor: p.trabajador || contrato.proveedor || '',

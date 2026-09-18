@@ -432,7 +432,7 @@
     var pagadoGastos = r2(propios.filter(function (g) { return g.pagado; }).reduce(function (s, g) { return s + num(g.monto); }, 0));
     var contsCat = (contratos || []).filter(function (c) { return c.categoriaId === categoria.id; });
     var idsConts = contsCat.map(function (c) { return c.id; });
-    var pagosCat = (pagos || []).filter(function (p) { return idsConts.indexOf(p.contratoId) !== -1; });
+    var pagosCat = (pagos || []).filter(function (p) { return p.categoriaId === categoria.id || idsConts.indexOf(p.contratoId) !== -1; });
     var montoPagos = r2(pagosCat.reduce(function (s, p) { return s + num(p.monto); }, 0));
     var gastado = r2(gastadoGastos + montoPagos);
     var pagado = r2(pagadoGastos + montoPagos);
