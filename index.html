@@ -301,6 +301,7 @@ input[type=range]::-moz-range-thumb{width:17px;height:17px;border-radius:50%;bac
 <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="engine.js"></script>
 <script src="photos.js"></script>
 
@@ -1887,7 +1888,18 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
    VISTA: OFERTAS
    ============================================================ */
 function ofertaVacia() {
-  return { id: E.uid('of'), proveedor: '', precioUnitario: '', total: '', dias: '', calidad: '3', garantia: '', notas: '' };
+  return { id: E.uid('of'), proveedor: '', precioUnitario: '', total: '', dias: '', calidad: '3', garantia: '', notas: '', items: [] };
+}
+function itemOfertaVacio() {
+  return { id: E.uid('it'), descripcion: '', unidad: 'unidad', cantidad: '', precioUnitario: '', aplicaIVA: false };
+}
+function calcTotalOferta(items) {
+  if (!items || items.length === 0) return 0;
+  return E.r2(items.reduce(function (s, it) {
+    var sub = E.r2(E.num(it.cantidad) * E.num(it.precioUnitario));
+    var iva = it.aplicaIVA ? E.r2(sub * 0.15) : 0;
+    return s + sub + iva;
+  }, 0));
 }
 function licVacia(proyectoId, catId) {
   return {
@@ -1990,12 +2002,20 @@ function Ofertas({ estado, dinero, accion, brindar, registrarBorrado }) {
   const guardarLic = () => {
     if (!form.titulo.trim()) return brindar('Ponle un título al comparativo.', 'err');
     const ofertas = form.ofertas
-      .filter((o) => String(o.proveedor || '').trim() || E.num(o.precioUnitario) > 0 || E.num(o.total) > 0)
-      .map((o) => ({
-        id: o.id, proveedor: String(o.proveedor || '').trim() || 'Sin nombre',
-        precioUnitario: E.r2(o.precioUnitario), total: E.r2(o.total),
-        dias: E.num(o.dias), calidad: E.num(o.calidad), garantia: E.num(o.garantia), notas: o.notas || '',
-      }));
+      .filter((o) => String(o.proveedor || '').trim() || E.num(o.precioUnitario) > 0 || E.num(o.total) > 0 || (o.items && o.items.length > 0))
+      .map((o) => {
+        const items = (o.items || []).filter((it) => it.descripcion.trim() || E.num(it.cantidad) > 0 || E.num(it.precioUnitario) > 0).map((it) => ({
+          id: it.id, descripcion: it.descripcion.trim(), unidad: it.unidad || 'unidad',
+          cantidad: E.num(it.cantidad), precioUnitario: E.r2(it.precioUnitario), aplicaIVA: !!it.aplicaIVA,
+        }));
+        const totalItems = calcTotalOferta(items);
+        return {
+          id: o.id, proveedor: String(o.proveedor || '').trim() || 'Sin nombre',
+          precioUnitario: E.r2(o.precioUnitario), total: items.length > 0 ? totalItems : E.r2(o.total),
+          dias: E.num(o.dias), calidad: E.num(o.calidad), garantia: E.num(o.garantia), notas: o.notas || '',
+          items: items.length > 0 ? items : undefined,
+        };
+      });
     if (ofertas.length === 0) return brindar('Ingresa al menos una oferta con precio.', 'err');
 
     const lic = {
@@ -2064,6 +2084,10 @@ function Ofertas({ estado, dinero, accion, brindar, registrarBorrado }) {
       calidad: String(o.calidad || ''),
       garantia: String(o.garantia || ''),
       notas: o.notas || '',
+      items: (o.items || []).map((it) => ({
+        id: it.id || E.uid('it'), descripcion: it.descripcion || '', unidad: it.unidad || 'unidad',
+        cantidad: String(it.cantidad || ''), precioUnitario: String(it.precioUnitario || ''), aplicaIVA: !!it.aplicaIVA,
+      })),
     }));
     while (previas.length < 3) previas.push(ofertaVacia());
     setForm({
@@ -2189,11 +2213,16 @@ function Ofertas({ estado, dinero, accion, brindar, registrarBorrado }) {
                           </tr>
                         </thead>
                         <tbody>
-                          {r.ofertas.map((o) => (
-                            <tr key={o.id} className={o.esMejorValor ? 'ganadora' : ''}>
+                          {r.ofertas.map((o) => {
+                            const origOferta = (l.ofertas || []).find((x) => x.id === o.id);
+                            const tieneItems = origOferta && origOferta.items && origOferta.items.length > 0;
+                            return (
+                            <React.Fragment key={o.id}>
+                            <tr className={o.esMejorValor ? 'ganadora' : ''}>
                               <td>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                   <span style={{ fontWeight: 600 }}>{o.proveedor}</span>
+                                  {tieneItems ? <span className="chip chip-neutro" style={{ fontSize: 9, padding: '1px 6px' }}>{origOferta.items.length} ítems</span> : null}
                                   {conteoFotosOfertas[o.id] ? (
                                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: 'var(--ambar)', fontSize: 12 }}>
                                       <Icono n="camara" s={14} c="var(--ambar)" />{conteoFotosOfertas[o.id]}
@@ -2229,7 +2258,40 @@ function Ofertas({ estado, dinero, accion, brindar, registrarBorrado }) {
                                 ) : null}
                               </td>
                             </tr>
-                          ))}
+                            {tieneItems ? (
+                              <tr>
+                                <td colSpan={9} style={{ padding: '0 12px 12px', background: 'rgba(255,255,255,.02)' }}>
+                                  <table style={{ fontSize: 12, minWidth: 0, margin: 0 }}>
+                                    <thead><tr>
+                                      <th style={{ fontSize: 9 }}>Descripción</th><th style={{ fontSize: 9 }}>Unidad</th>
+                                      <th className="der" style={{ fontSize: 9 }}>Cant.</th><th className="der" style={{ fontSize: 9 }}>P. Unit.</th>
+                                      <th className="der" style={{ fontSize: 9 }}>Subtotal</th><th className="cen" style={{ fontSize: 9 }}>IVA</th>
+                                      <th className="der" style={{ fontSize: 9 }}>Total</th>
+                                    </tr></thead>
+                                    <tbody>
+                                      {origOferta.items.map((it) => {
+                                        const sub = E.r2(E.num(it.cantidad) * E.num(it.precioUnitario));
+                                        const iva = it.aplicaIVA ? E.r2(sub * 0.15) : 0;
+                                        return (
+                                          <tr key={it.id}>
+                                            <td style={{ fontSize: 12 }}>{it.descripcion}</td>
+                                            <td style={{ fontSize: 12 }}>{it.unidad}</td>
+                                            <td className="der mono" style={{ fontSize: 12 }}>{E.num(it.cantidad)}</td>
+                                            <td className="der mono" style={{ fontSize: 12 }}>{dinero(it.precioUnitario)}</td>
+                                            <td className="der mono" style={{ fontSize: 12 }}>{dinero(sub)}</td>
+                                            <td className="cen" style={{ fontSize: 12 }}>{it.aplicaIVA ? '✓' : '—'}</td>
+                                            <td className="der mono" style={{ fontSize: 12, fontWeight: 600 }}>{dinero(E.r2(sub + iva))}</td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </td>
+                              </tr>
+                            ) : null}
+                            </React.Fragment>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -2404,16 +2466,127 @@ function Ofertas({ estado, dinero, accion, brindar, registrarBorrado }) {
                   ) : null}
                 </div>
               </Campo>
-              <div className="dos">
-                <Campo etq="Precio unitario">
-                  <input className="mono" inputMode="decimal" value={o.precioUnitario} placeholder="0.00"
-                    onChange={(e) => setForm({ ...form, ofertas: form.ofertas.map((x, j) => (j === i ? { ...x, precioUnitario: e.target.value } : x)) })} />
-                </Campo>
-                <Campo etq="Total (si es precio cerrado)">
-                  <input className="mono" inputMode="decimal" value={o.total} placeholder="opcional"
-                    onChange={(e) => setForm({ ...form, ofertas: form.ofertas.map((x, j) => (j === i ? { ...x, total: e.target.value } : x)) })} />
-                </Campo>
+              {/* Tabla de ítems/productos de la oferta */}
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--texto-3)', fontWeight: 700 }}>Productos / ítems</span>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <label className="btn btn-sm" style={{ cursor: 'pointer' }}>
+                      <span>📥 Importar Excel</span>
+                      <input type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={(e) => {
+                        const archivo = e.target.files[0];
+                        e.target.value = '';
+                        if (!archivo) return;
+                        const lector = new FileReader();
+                        lector.onload = (ev) => {
+                          try {
+                            const wb = XLSX.read(ev.target.result, { type: 'array' });
+                            const hoja = wb.Sheets[wb.SheetNames[0]];
+                            const filas = XLSX.utils.sheet_to_json(hoja, { defval: '' });
+                            if (filas.length === 0) return brindar('El archivo está vacío.', 'err');
+                            const buscar = (fila, claves) => { for (const k of Object.keys(fila)) { const kl = k.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); for (const c of claves) { if (kl.includes(c)) return fila[k]; } } return ''; };
+                            const nuevos = filas.map((fila) => {
+                              const ivaVal = String(buscar(fila, ['iva'])).toLowerCase().trim();
+                              return {
+                                id: E.uid('it'),
+                                descripcion: String(buscar(fila, ['descrip']) || '').trim(),
+                                unidad: String(buscar(fila, ['unidad', 'medida', 'u/m', 'um']) || 'unidad').trim(),
+                                cantidad: String(buscar(fila, ['cantidad', 'cant', 'qty'])),
+                                precioUnitario: String(buscar(fila, ['precio', 'unitario', 'p.u', 'pu', 'costo'])),
+                                aplicaIVA: ['si', 'sí', 'yes', 'true', '1'].includes(ivaVal),
+                              };
+                            }).filter((it) => it.descripcion || E.num(it.cantidad) > 0);
+                            if (nuevos.length === 0) return brindar('No se encontraron ítems. Columnas esperadas: Descripción, Unidad, Cantidad, Precio, IVA.', 'err');
+                            setForm({ ...form, ofertas: form.ofertas.map((x, j) => (j === i ? { ...x, items: (x.items || []).concat(nuevos) } : x)) });
+                            brindar(nuevos.length + ' ítem(s) importados.', 'ok');
+                          } catch (err) { brindar('Error al leer el archivo: ' + err.message, 'err'); }
+                        };
+                        lector.readAsArrayBuffer(archivo);
+                      }} />
+                    </label>
+                    <button className="btn btn-sm" onClick={() => setForm({ ...form, ofertas: form.ofertas.map((x, j) => (j === i ? { ...x, items: (x.items || []).concat([itemOfertaVacio()]) } : x)) })}>
+                      <Icono n="mas" s={14} />Agregar ítem
+                    </button>
+                  </div>
+                </div>
+                {o.items && o.items.length > 0 ? (
+                  <React.Fragment>
+                    <div className="tabla-cont">
+                      <table style={{ fontSize: 13 }}>
+                        <thead>
+                          <tr>
+                            <th>Descripción</th>
+                            <th style={{ width: 80 }}>Unidad</th>
+                            <th className="der" style={{ width: 70 }}>Cant.</th>
+                            <th className="der" style={{ width: 90 }}>P. Unit.</th>
+                            <th className="der" style={{ width: 90 }}>Subtotal</th>
+                            <th className="cen" style={{ width: 50 }}>IVA</th>
+                            <th className="der" style={{ width: 90 }}>Total</th>
+                            <th style={{ width: 36 }}></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {o.items.map((it, k) => {
+                            const sub = E.r2(E.num(it.cantidad) * E.num(it.precioUnitario));
+                            const iva = it.aplicaIVA ? E.r2(sub * 0.15) : 0;
+                            const totalIt = E.r2(sub + iva);
+                            return (
+                              <tr key={it.id}>
+                                <td><input value={it.descripcion} placeholder="Producto…" style={{ background: 'transparent', border: 'none', color: 'var(--texto)', width: '100%', padding: '4px 0' }} onChange={(e) => {
+                                  const items2 = o.items.map((x, m) => (m === k ? { ...x, descripcion: e.target.value } : x));
+                                  setForm({ ...form, ofertas: form.ofertas.map((x, j) => (j === i ? { ...x, items: items2 } : x)) });
+                                }} /></td>
+                                <td><input value={it.unidad} style={{ background: 'transparent', border: 'none', color: 'var(--texto)', width: '100%', padding: '4px 0', fontSize: 12 }} onChange={(e) => {
+                                  const items2 = o.items.map((x, m) => (m === k ? { ...x, unidad: e.target.value } : x));
+                                  setForm({ ...form, ofertas: form.ofertas.map((x, j) => (j === i ? { ...x, items: items2 } : x)) });
+                                }} /></td>
+                                <td className="der"><input className="mono" inputMode="decimal" value={it.cantidad} placeholder="0" style={{ background: 'transparent', border: 'none', color: 'var(--texto)', width: '100%', textAlign: 'right', padding: '4px 0' }} onChange={(e) => {
+                                  const items2 = o.items.map((x, m) => (m === k ? { ...x, cantidad: e.target.value } : x));
+                                  setForm({ ...form, ofertas: form.ofertas.map((x, j) => (j === i ? { ...x, items: items2 } : x)) });
+                                }} /></td>
+                                <td className="der"><input className="mono" inputMode="decimal" value={it.precioUnitario} placeholder="0.00" style={{ background: 'transparent', border: 'none', color: 'var(--texto)', width: '100%', textAlign: 'right', padding: '4px 0' }} onChange={(e) => {
+                                  const items2 = o.items.map((x, m) => (m === k ? { ...x, precioUnitario: e.target.value } : x));
+                                  setForm({ ...form, ofertas: form.ofertas.map((x, j) => (j === i ? { ...x, items: items2 } : x)) });
+                                }} /></td>
+                                <td className="der mono" style={{ color: 'var(--texto-2)' }}>{sub > 0 ? dinero(sub) : '—'}</td>
+                                <td className="cen"><input type="checkbox" checked={!!it.aplicaIVA} onChange={(e) => {
+                                  const items2 = o.items.map((x, m) => (m === k ? { ...x, aplicaIVA: e.target.checked } : x));
+                                  setForm({ ...form, ofertas: form.ofertas.map((x, j) => (j === i ? { ...x, items: items2 } : x)) });
+                                }} /></td>
+                                <td className="der mono" style={{ fontWeight: 600 }}>{totalIt > 0 ? dinero(totalIt) : '—'}</td>
+                                <td className="cen"><button className="btn-icono" onClick={() => {
+                                  const items2 = o.items.filter((_, m) => m !== k);
+                                  setForm({ ...form, ofertas: form.ofertas.map((x, j) => (j === i ? { ...x, items: items2 } : x)) });
+                                }}><Icono n="basura" s={14} /></button></td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <td colSpan={6} style={{ textAlign: 'right', fontWeight: 700, fontSize: 13, borderTop: '2px solid var(--borde)' }}>Total oferta:</td>
+                            <td className="der mono" style={{ fontWeight: 700, fontSize: 14, color: 'var(--ambar)', borderTop: '2px solid var(--borde)' }}>{dinero(calcTotalOferta(o.items))}</td>
+                            <td style={{ borderTop: '2px solid var(--borde)' }}></td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </React.Fragment>
+                ) : null}
               </div>
+              {/* Precio manual (solo si no hay ítems) */}
+              {(!o.items || o.items.length === 0) ? (
+                <div className="dos">
+                  <Campo etq="Precio unitario">
+                    <input className="mono" inputMode="decimal" value={o.precioUnitario} placeholder="0.00"
+                      onChange={(e) => setForm({ ...form, ofertas: form.ofertas.map((x, j) => (j === i ? { ...x, precioUnitario: e.target.value } : x)) })} />
+                  </Campo>
+                  <Campo etq="Total (si es precio cerrado)">
+                    <input className="mono" inputMode="decimal" value={o.total} placeholder="opcional"
+                      onChange={(e) => setForm({ ...form, ofertas: form.ofertas.map((x, j) => (j === i ? { ...x, total: e.target.value } : x)) })} />
+                  </Campo>
+                </div>
+              ) : null}
               <div className="tres">
                 <Campo etq="Días de entrega">
                   <input className="mono" inputMode="numeric" value={o.dias} placeholder="—"
