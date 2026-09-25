@@ -1777,6 +1777,48 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
             </div>
           </div>
 
+          <Campo etq={'Adjuntos (' + fotos.length + '/' + FOTOS.MAX_FOTOS_POR_GASTO + ')'}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 9 }}>
+                  {fotos.map((f) => (
+                    <div key={f.id} style={{ position: 'relative', width: 68, height: 68, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--borde)' }}>
+                      {f.tipo === 'pdf' ? (
+                        <a href={f.dataURL} target="_blank" rel="noopener noreferrer"
+                          style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--panel-2)', textDecoration: 'none', color: 'var(--rojo)' }}>
+                          <span style={{ fontSize: 22, fontWeight: 700 }}>PDF</span>
+                          <span style={{ fontSize: 9, color: 'var(--texto-3)', maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.nombre || 'documento'}</span>
+                        </a>
+                      ) : (
+                        <img src={f.dataURL} alt="Factura"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', cursor: 'zoom-in' }}
+                          onClick={() => setFotoAmpliada(f.dataURL)} />
+                      )}
+                      <button onClick={() => quitarFoto(f.id)} title="Quitar adjunto"
+                        style={{ position: 'absolute', top: 2, right: 2, width: 20, height: 20, borderRadius: '50%', background: 'rgba(8,17,19,.85)', display: 'grid', placeItems: 'center' }}>
+                        <Icono n="equis" s={12} c="#fff" />
+                      </button>
+                    </div>
+                  ))}
+                  {FOTOS.puedeAgregarMas(fotos) ? (
+                    <React.Fragment>
+                      <button onClick={() => inputCamara.current && inputCamara.current.click()} disabled={subiendo}
+                        style={{ width: 68, height: 68, borderRadius: 10, border: '1px dashed var(--borde-fuerte)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, color: 'var(--texto-2)' }}>
+                        <Icono n="camara" s={19} /><span style={{ fontSize: 10 }}>Cámara</span>
+                      </button>
+                      <button onClick={() => inputGaleria.current && inputGaleria.current.click()} disabled={subiendo}
+                        style={{ width: 68, height: 68, borderRadius: 10, border: '1px dashed var(--borde-fuerte)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, color: 'var(--texto-2)' }}>
+                        <Icono n="ofertas" s={19} /><span style={{ fontSize: 10 }}>Archivo</span>
+                      </button>
+                    </React.Fragment>
+                  ) : null}
+                  {subiendo ? <div style={{ width: 68, height: 68, borderRadius: 10, background: 'var(--panel-2)', display: 'grid', placeItems: 'center' }}><span className="mini">…</span></div> : null}
+                </div>
+                <input ref={inputCamara} type="file" accept="image/*,.heic,.heif" capture="environment" style={{ display: 'none' }}
+                  onChange={(e) => { agregarFotos(e.target.files); e.target.value = ''; }} />
+                <input ref={inputGaleria} type="file" accept="image/*,.heic,.heif,application/pdf" multiple style={{ display: 'none' }}
+                  onChange={(e) => { agregarFotos(e.target.files); e.target.value = ''; }} />
+                <div className="mini" style={{ marginTop: 8 }}>Imágenes o PDF. Se guarda en este dispositivo, no se sube a internet.</div>
+              </Campo>
+
           <button type="button" onClick={() => setMasDetalles(!masDetalles)}
             style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'var(--texto-2)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '4px 0', marginBottom: masDetalles ? 10 : 0 }}>
             <Icono n={masDetalles ? 'abajo' : 'derecha'} s={14} />
@@ -1830,48 +1872,6 @@ function Gastos({ estado, dinero, accion, brindar, filtroInicial, limpiarFiltroI
                     onChange={(e) => setForm({ ...form, fechaVencimiento: e.target.value })} />
                 </Campo>
               ) : null}
-
-              <Campo etq={'Adjuntos (' + fotos.length + '/' + FOTOS.MAX_FOTOS_POR_GASTO + ')'}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 9 }}>
-                  {fotos.map((f) => (
-                    <div key={f.id} style={{ position: 'relative', width: 68, height: 68, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--borde)' }}>
-                      {f.tipo === 'pdf' ? (
-                        <a href={f.dataURL} target="_blank" rel="noopener noreferrer"
-                          style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--panel-2)', textDecoration: 'none', color: 'var(--rojo)' }}>
-                          <span style={{ fontSize: 22, fontWeight: 700 }}>PDF</span>
-                          <span style={{ fontSize: 9, color: 'var(--texto-3)', maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.nombre || 'documento'}</span>
-                        </a>
-                      ) : (
-                        <img src={f.dataURL} alt="Factura"
-                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', cursor: 'zoom-in' }}
-                          onClick={() => setFotoAmpliada(f.dataURL)} />
-                      )}
-                      <button onClick={() => quitarFoto(f.id)} title="Quitar adjunto"
-                        style={{ position: 'absolute', top: 2, right: 2, width: 20, height: 20, borderRadius: '50%', background: 'rgba(8,17,19,.85)', display: 'grid', placeItems: 'center' }}>
-                        <Icono n="equis" s={12} c="#fff" />
-                      </button>
-                    </div>
-                  ))}
-                  {FOTOS.puedeAgregarMas(fotos) ? (
-                    <React.Fragment>
-                      <button onClick={() => inputCamara.current && inputCamara.current.click()} disabled={subiendo}
-                        style={{ width: 68, height: 68, borderRadius: 10, border: '1px dashed var(--borde-fuerte)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, color: 'var(--texto-2)' }}>
-                        <Icono n="camara" s={19} /><span style={{ fontSize: 10 }}>Cámara</span>
-                      </button>
-                      <button onClick={() => inputGaleria.current && inputGaleria.current.click()} disabled={subiendo}
-                        style={{ width: 68, height: 68, borderRadius: 10, border: '1px dashed var(--borde-fuerte)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, color: 'var(--texto-2)' }}>
-                        <Icono n="ofertas" s={19} /><span style={{ fontSize: 10 }}>Archivo</span>
-                      </button>
-                    </React.Fragment>
-                  ) : null}
-                  {subiendo ? <div style={{ width: 68, height: 68, borderRadius: 10, background: 'var(--panel-2)', display: 'grid', placeItems: 'center' }}><span className="mini">…</span></div> : null}
-                </div>
-                <input ref={inputCamara} type="file" accept="image/*,.heic,.heif" capture="environment" style={{ display: 'none' }}
-                  onChange={(e) => { agregarFotos(e.target.files); e.target.value = ''; }} />
-                <input ref={inputGaleria} type="file" accept="image/*,.heic,.heif,application/pdf" multiple style={{ display: 'none' }}
-                  onChange={(e) => { agregarFotos(e.target.files); e.target.value = ''; }} />
-                <div className="mini" style={{ marginTop: 8 }}>Imágenes o PDF. Se guarda en este dispositivo, no se sube a internet.</div>
-              </Campo>
 
               <Campo etq="Notas (opcional)">
                 <textarea value={form.notas} onChange={(e) => setForm({ ...form, notas: e.target.value })} placeholder="Detalles, condiciones…" />
