@@ -3221,13 +3221,11 @@ function Pagos({ estado, dinero, accion, brindar, registrarBorrado }) {
             <Campo etq="Monto"><input className="mono" inputMode="decimal" value={form.monto} placeholder="0.00" onChange={(e) => setForm({...form,monto:e.target.value})} /></Campo>
             <Campo etq="Fecha"><input type="date" value={form.fecha} onChange={(e) => setForm({...form,fecha:e.target.value})} /></Campo>
           </div>
-          <Campo etq="Referencia (N° cheque, transf., etc.)"><input value={form.referencia} placeholder="Opcional" onChange={(e) => setForm({...form,referencia:e.target.value})} /></Campo>
           <div className="dos">
             <Campo etq="Contrato (abono a)"><select value={form.contratoId} onChange={(e) => setForm({...form,contratoId:e.target.value})}><option value="">Ninguno (pago independiente)</option>{contratosProyecto.map((c) => <option key={c.id} value={c.id}>{c.titulo} — {dinero(c.montoContrato, true)}</option>)}</select></Campo>
             <Campo etq="Categoría presupuesto"><select value={form.categoriaId || ''} onChange={(e) => setForm({...form,categoriaId:e.target.value})}><option value="">Sin categoría</option>{cats.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select></Campo>
           </div>
           {form.contratoId && contMap[form.contratoId] ? (() => { const ct = contMap[form.contratoId]; const ab = E.r2((estado.pagos||[]).filter((p) => p.contratoId === form.contratoId && p.id !== form.id).reduce((s,p) => s + E.num(p.monto), 0)); const saldo = E.r2(E.num(ct.montoContrato) - ab); return <div style={{background:'var(--fondo-elev)',borderRadius:8,padding:'10px 14px',marginBottom:14,fontSize:13}}><div className="dos"><div><span className="tenue">Monto contrato: </span><span className="mono" style={{fontWeight:700}}>{dinero(ct.montoContrato, true)}</span></div><div><span className="tenue">Ya abonado: </span><span className="mono">{dinero(ab, true)}</span></div></div><div style={{marginTop:6}}><span className="tenue">Saldo pendiente: </span><span className="mono" style={{fontWeight:700,color: saldo > 0 ? 'var(--rojo)' : 'var(--menta)'}}>{dinero(saldo, true)}</span></div></div>; })() : null}
-          <Campo etq="Trabajador (opcional)"><input value={form.trabajador||''} placeholder="Nombre del trabajador" onChange={(e) => setForm({...form,trabajador:e.target.value})} /></Campo>
           <Campo etq={'Comprobantes (' + fotos.length + '/' + FOTOS.MAX_FOTOS_POR_GASTO + ')'}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 9 }}>
               {fotos.map((f) => (
@@ -3267,6 +3265,8 @@ function Pagos({ estado, dinero, accion, brindar, registrarBorrado }) {
               onChange={(e) => { agregarFotosP(e.target.files); e.target.value = ''; }} />
             <div className="mini" style={{ marginTop: 8 }}>Fotos o PDF de comprobantes.</div>
           </Campo>
+          <Campo etq="Referencia (N° cheque, transf., etc.)"><input value={form.referencia} placeholder="Opcional" onChange={(e) => setForm({...form,referencia:e.target.value})} /></Campo>
+          <Campo etq="Trabajador (opcional)"><input value={form.trabajador||''} placeholder="Nombre del trabajador" onChange={(e) => setForm({...form,trabajador:e.target.value})} /></Campo>
           <Campo etq="Notas"><textarea value={form.notas||''} onChange={(e) => setForm({...form,notas:e.target.value})} /></Campo>
         </Modal>
       ) : null}
